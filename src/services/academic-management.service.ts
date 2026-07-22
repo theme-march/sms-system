@@ -1,3 +1,4 @@
+"use server";
 import prisma from '@/src/lib/db/prisma';
 import { validateSingleCurrentYear } from '@/src/lib/validations/academic';
 

@@ -1,4 +1,4 @@
-import { PrismaClient, UserStatus, Gender, AttendanceStatus, PaymentStatus, PaymentMethod, PayrollStatus } from '@prisma/client';
+import { PrismaClient, UserStatus, Gender, AttendanceStatus, PaymentStatus, PaymentMethod } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
