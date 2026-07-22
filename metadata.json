@@ -1,0 +1,6 @@
+{
+  "name": "School Management System",
+  "description": "A production-ready School Management System built with Next.js App Router, Prisma ORM, MySQL, and Tailwind CSS with English/Bangla i18n support and granular RBAC.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
