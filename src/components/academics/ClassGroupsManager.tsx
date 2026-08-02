@@ -13,14 +13,18 @@ import {
   ClassGroupRecord,
   ClassRecord,
   GroupRecord,
+  getAcademicYears,
 } from '@/src/services/academic-management.service';
 import { classGroupSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function ClassGroupsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<ClassGroupRecord[]>([]);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [groups, setGroups] = useState<GroupRecord[]>([]);
+  const [academicYearId, setAcademicYearId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -48,7 +52,7 @@ export function ClassGroupsManager() {
     setLoading(true);
     setError(null);
     try {
-      const [res, clsRes, grpRes] = await Promise.all([
+      const [res, clsRes, grpRes, yearRes] = await Promise.all([
         getClassGroupsList({
           page,
           pageSize,
@@ -58,12 +62,14 @@ export function ClassGroupsManager() {
         }),
         getClassesList({ page: 1, pageSize: 50 }),
         getGroupsList({ page: 1, pageSize: 50 }),
+        getAcademicYears({ page: 1, pageSize: 50, schoolId }),
       ]);
       setData(res.data);
       setTotalPages(res.totalPages);
       setTotalCount(res.total);
       setClasses(clsRes.data);
       setGroups(grpRes.data);
+      setAcademicYearId(yearRes.data.find((year) => year.isCurrent)?.id || yearRes.data[0]?.id || '');
     } catch {
       setError('Failed to load class-group mappings');
     } finally {
@@ -107,8 +113,8 @@ export function ClassGroupsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
-      academicYearId: 'ay-2026',
+      schoolId,
+      academicYearId,
       ...formData,
     };
 

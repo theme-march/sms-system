@@ -12,8 +12,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { groupSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function GroupsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<GroupRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function GroupsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 

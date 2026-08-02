@@ -14,8 +14,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { academicSessionSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function AcademicSessionsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<AcademicSessionRecord[]>([]);
   const [years, setYears] = useState<AcademicYearRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +111,7 @@ export function AcademicSessionsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 

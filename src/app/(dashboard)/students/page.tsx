@@ -38,8 +38,8 @@ export default function StudentsPage() {
       StudentCode: s.studentCode || s.id,
       NameEN: s.nameEn || s.user?.name,
       NameBN: s.nameBn || '-',
-      Class: s.class?.name || 'Class 10',
-      Section: s.section?.name || 'Padma',
+      Class: s.class?.name || '',
+      Section: s.section?.name || '',
       Roll: s.rollNumber || '-',
       Phone: s.phone || s.user?.phone || '-',
       Status: s.status || 'ACTIVE',
@@ -60,11 +60,11 @@ export default function StudentsPage() {
       admNo: s.admissionNumber || s.studentId || '-',
       code: s.studentCode || s.id,
       name: s.nameEn || s.user?.name,
-      cls: `${s.class?.name || 'Class 10'} (${s.section?.name || 'Padma'})`,
+      cls: [s.class?.name, s.section?.name].filter(Boolean).join(' - ') || '-',
       roll: `#${s.rollNumber || '-'}`,
       phone: s.phone || s.user?.phone || '-',
     }));
-    generatePDF('Student Directory 2026', 'Dhaka Ideal Model High School & College', cols, pdfData);
+    generatePDF('Student Directory', 'School Management System', cols, pdfData);
   };
 
   return (

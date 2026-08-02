@@ -13,14 +13,18 @@ import {
   ClassSectionRecord,
   ClassRecord,
   SectionRecord,
+  getAcademicYears,
 } from '@/src/services/academic-management.service';
 import { classSectionSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function ClassSectionsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<ClassSectionRecord[]>([]);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [sections, setSections] = useState<SectionRecord[]>([]);
+  const [academicYearId, setAcademicYearId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -49,7 +53,7 @@ export function ClassSectionsManager() {
     setLoading(true);
     setError(null);
     try {
-      const [res, clsRes, secRes] = await Promise.all([
+      const [res, clsRes, secRes, yearRes] = await Promise.all([
         getClassSectionsList({
           page,
           pageSize,
@@ -59,12 +63,14 @@ export function ClassSectionsManager() {
         }),
         getClassesList({ page: 1, pageSize: 50 }),
         getSectionsList({ page: 1, pageSize: 50 }),
+        getAcademicYears({ page: 1, pageSize: 50, schoolId }),
       ]);
       setData(res.data);
       setTotalPages(res.totalPages);
       setTotalCount(res.total);
       setClasses(clsRes.data);
       setSections(secRes.data);
+      setAcademicYearId(yearRes.data.find((year) => year.isCurrent)?.id || yearRes.data[0]?.id || '');
     } catch {
       setError('Failed to load class-section assignments');
     } finally {
@@ -110,8 +116,8 @@ export function ClassSectionsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
-      academicYearId: 'ay-2026',
+      schoolId,
+      academicYearId,
       ...formData,
     };
 

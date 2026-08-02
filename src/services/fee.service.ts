@@ -1,4 +1,7 @@
+'use server';
+
 import prisma from '@/src/lib/db/prisma';
+import { toClientData } from '@/src/lib/serialize';
 import { createAuditLog } from '@/src/lib/audit';
 import {
   calculateInvoiceBreakdown,
@@ -7,27 +10,25 @@ import {
   canIssueAdmitCard,
 } from '@/src/lib/validations/fee';
 
-export async function getFeeOverview() {
-  try {
-    const totalCollected = await (prisma as any).payment.aggregate({
-      _sum: { amount: true },
-      where: { status: 'CONFIRMED' },
-    });
-    const totalPending = await (prisma as any).studentInvoice.aggregate({
+export async function getFeeOverview(schoolId?: string) {
+    const [totalCollected, totalPending] = await Promise.all([
+      prisma.feeInvoice.aggregate({
+        where: schoolId ? { schoolId } : undefined,
+        _sum: { paidAmount: true },
+      }),
+      prisma.studentInvoice.aggregate({
+      where: {
+        ...(schoolId ? { schoolId } : {}),
+        paymentStatus: { in: ['unpaid', 'partially_paid', 'overdue'] },
+      },
       _sum: { dueAmount: true },
-      where: { paymentStatus: { in: ['unpaid', 'partially_paid', 'overdue'] } },
-    });
+      }),
+    ]);
 
     return {
-      collectedAmount: totalCollected._sum?.amount ? Number(totalCollected._sum.amount) : 1845000,
-      pendingAmount: totalPending._sum?.dueAmount ? Number(totalPending._sum.dueAmount) : 235000,
+      collectedAmount: Number(totalCollected._sum.paidAmount ?? 0),
+      pendingAmount: Number(totalPending._sum.dueAmount ?? 0),
     };
-  } catch {
-    return {
-      collectedAmount: 1845000,
-      pendingAmount: 235000,
-    };
-  }
 }
 
 export interface BulkMonthlyInvoicePayload {
@@ -77,42 +78,22 @@ export interface PaymentReversalPayload {
 // FEE TYPES & STRUCTURES
 // -------------------------------------------------------------
 
-export async function getFeeTypes(schoolId: string = 'school-1') {
-  try {
-    const records = await (prisma as any).feeType.findMany({
+export async function getFeeTypes(schoolId: string) {
+    return toClientData(await prisma.feeType.findMany({
       where: { schoolId },
       orderBy: { name: 'asc' },
-    });
-
-    if (records.length > 0) return records;
-  } catch {
-    // Fallback data
-  }
-
-  return [
-    { id: 'ft-1', schoolId, name: 'Monthly Tuition Fee', code: 'TUITION', category: 'TUITION', description: 'Regular monthly tuition fee', isRecurring: true },
-    { id: 'ft-2', schoolId, name: 'Admission Fee', code: 'ADMISSION', category: 'ADMISSION', description: 'One-time admission charge', isRecurring: false },
-    { id: 'ft-3', schoolId, name: 'Examination Fee', code: 'EXAM', category: 'EXAM', description: 'Fee per term examination', isRecurring: false },
-    { id: 'ft-4', schoolId, name: 'Session Fee', code: 'SESSION', category: 'SESSION', description: 'Annual session charge', isRecurring: false },
-    { id: 'ft-5', schoolId, name: 'Registration Fee', code: 'REGISTRATION', category: 'REGISTRATION', description: 'Board/school registration', isRecurring: false },
-    { id: 'ft-6', schoolId, name: 'Development Fee', code: 'DEVELOPMENT', category: 'DEVELOPMENT', description: 'Campus development charge', isRecurring: false },
-    { id: 'ft-7', schoolId, name: 'Laboratory Fee', code: 'LAB', category: 'LAB', description: 'Practical lab materials', isRecurring: true },
-    { id: 'ft-8', schoolId, name: 'Library Fee', code: 'LIBRARY', category: 'LIBRARY', description: 'Library maintenance', isRecurring: true },
-    { id: 'ft-9', schoolId, name: 'Transport Fee', code: 'TRANSPORT', category: 'TRANSPORT', description: 'Monthly bus service', isRecurring: true },
-    { id: 'ft-10', schoolId, name: 'Late Fee', code: 'LATE_FINE', category: 'LATE_FINE', description: 'Late payment penalty', isRecurring: false },
-    { id: 'ft-11', schoolId, name: 'Other Fee', code: 'OTHER', category: 'OTHER', description: 'Miscellaneous charges', isRecurring: false },
-  ];
+    }));
 }
 
 export async function createFeeType(data: {
-  schoolId?: string;
+  schoolId: string;
   name: string;
   code: string;
   category: string;
   description?: string;
   isRecurring?: boolean;
 }) {
-  const schoolId = data.schoolId || 'school-1';
+  const schoolId = data.schoolId;
   try {
     const created = await (prisma as any).feeType.create({
       data: {
@@ -132,19 +113,10 @@ export async function createFeeType(data: {
       details: `Created Fee Type ${data.name} (${data.code})`,
     });
 
-    return created;
-  } catch {
-    return {
-      id: `ft-${Date.now()}`,
-      schoolId,
-      name: data.name,
-      code: data.code.toUpperCase(),
-      category: data.category,
-      description: data.description || '',
-      isRecurring: data.isRecurring ?? true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    return toClientData(created);
+  } catch (error) {
+    console.error('Failed to create fee type:', error);
+    throw error;
   }
 }
 
@@ -229,16 +201,16 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
       }
 
       // Base amount calculation
-      const studentSchedule = feeSchedules.find((s) => s.studentId === enr.studentId) || feeSchedules[0];
+      const studentSchedule = feeSchedules.find((s: any) => s.studentId === enr.studentId) || feeSchedules[0];
       const baseAmount = studentSchedule ? Number(studentSchedule.monthlyAmount) : 2500;
 
       const calc = calculateInvoiceBreakdown({
         baseAmount,
-        scholarships: scholarships.map((s) => ({
+        scholarships: scholarships.map((s: any) => ({
           percentageOrAmount: Number(s.percentageOrAmount),
           isPercentage: s.isPercentage,
         })),
-        waivers: waivers.map((w) => ({
+        waivers: waivers.map((w: any) => ({
           waiverValue: Number(w.waiverValue),
           waiverType: w.waiverType as 'PERCENTAGE' | 'FIXED',
         })),
@@ -319,16 +291,9 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
       billingYear,
       billingMonth,
     };
-  } catch {
-    // Graceful fallback for mock runtime environment
-    return {
-      success: true,
-      generatedCount: 28,
-      skippedCount: 2,
-      totalInvoicedAmount: 70000,
-      billingYear,
-      billingMonth,
-    };
+  } catch (error) {
+    console.error('Bulk invoice generation failed:', error);
+    throw new Error('Bulk invoices could not be generated. No records were created.');
   }
 }
 
@@ -420,8 +385,9 @@ export async function generateExamFeeInvoices(payload: ExamFeeInvoicePayload) {
     });
 
     return { success: true, generatedCount, skippedCount };
-  } catch {
-    return { success: true, generatedCount: 30, skippedCount: 0 };
+  } catch (error) {
+    console.error('Failed to generate bulk exam fee invoices:', error);
+    throw error;
   }
 }
 
@@ -553,16 +519,9 @@ export async function processPayment(payload: PaymentProcessPayload) {
       remainingDue: result.newInvoiceDue,
       paymentStatus: result.newStatus,
     };
-  } catch (err: any) {
-    return {
-      success: true,
-      paymentNumber: `PAY-${Date.now().toString().slice(-6)}`,
-      receiptNumber: `REC-${Date.now().toString().slice(-6)}`,
-      paidAmount: amount,
-      remainingDue: 0,
-      paymentStatus: 'paid',
-      note: err?.message || 'Processed in offline mode',
-    };
+  } catch (err) {
+    console.error('Payment processing failed:', err);
+    throw new Error('Payment could not be saved. No receipt was issued.');
   }
 }
 
@@ -647,12 +606,9 @@ export async function processPaymentReversal(payload: PaymentReversalPayload) {
     });
 
     return { success: true, reversalNumber: revNo };
-  } catch (err: any) {
-    return {
-      success: true,
-      reversalNumber: `REV-${Date.now().toString().slice(-6)}`,
-      note: err?.message || 'Processed in offline fallback mode',
-    };
+  } catch (err) {
+    console.error('Payment reversal failed:', err);
+    throw new Error('Payment reversal could not be saved.');
   }
 }
 
@@ -660,64 +616,61 @@ export async function processPaymentReversal(payload: PaymentReversalPayload) {
 // ACCOUNTANT DASHBOARD STATS
 // -------------------------------------------------------------
 
-export async function getAccountantFeeDashboard(schoolId: string = 'school-1') {
-  try {
-    const totalInvoiced = await (prisma as any).studentInvoice.aggregate({
-      where: { schoolId },
+export async function getAccountantFeeDashboard(schoolId: string) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const examFeeTypes = await prisma.feeType.findMany({
+    where: { schoolId, category: 'EXAM' },
+    select: { id: true },
+  });
+  const examFeeTypeIds = examFeeTypes.map((feeType) => feeType.id);
+
+  const [invoiced, collected, due, examCollected, today, recentReceipts] = await Promise.all([
+    prisma.studentInvoice.aggregate({
+      where: { schoolId, createdAt: { gte: monthStart } },
       _sum: { totalAmount: true },
-    });
-
-    const totalCollected = await (prisma as any).payment.aggregate({
-      where: { schoolId, status: 'CONFIRMED' },
-      _sum: { amount: true },
-    });
-
-    const totalDue = await (prisma as any).studentInvoice.aggregate({
+    }),
+    prisma.receipt.aggregate({
+      where: { schoolId, generatedAt: { gte: monthStart } },
+      _sum: { totalPaid: true },
+    }),
+    prisma.studentInvoice.aggregate({
       where: { schoolId, paymentStatus: { in: ['unpaid', 'partially_paid', 'overdue'] } },
       _sum: { dueAmount: true },
-    });
-
-    const examFeeCollected = await (prisma as any).payment.aggregate({
-      where: { schoolId, status: 'CONFIRMED', accountHead: 'Exam Fee Account' },
-      _sum: { amount: true },
-    });
-
-    const recentReceipts = await (prisma as any).receipt.findMany({
+    }),
+    prisma.studentInvoice.aggregate({
+      where: { schoolId, feeTypeId: { in: examFeeTypeIds } },
+      _sum: { paidAmount: true },
+    }),
+    prisma.receipt.aggregate({
+      where: { schoolId, generatedAt: { gte: todayStart } },
+      _count: { id: true },
+      _sum: { totalPaid: true },
+    }),
+    prisma.receipt.findMany({
       where: { schoolId },
       take: 5,
       orderBy: { generatedAt: 'desc' },
-    });
+    }),
+  ]);
 
-    return {
-      currentMonthInvoiced: Number(totalInvoiced._sum?.totalAmount || 1850000),
-      currentMonthCollected: Number(totalCollected._sum?.amount || 1420000),
-      currentMonthDue: Number(totalDue._sum?.dueAmount || 430000),
-      examFeeCollected: Number(examFeeCollected._sum?.amount || 260000),
-      todayPaymentsCount: 14,
-      todayPaymentsAmount: 68500,
-      recentReceipts,
-    };
-  } catch {
-    return {
-      currentMonthInvoiced: 1850000,
-      currentMonthCollected: 1420000,
-      currentMonthDue: 430000,
-      examFeeCollected: 260000,
-      todayPaymentsCount: 14,
-      todayPaymentsAmount: 68500,
-      recentReceipts: [
-        { id: 'rec-1', receiptNumber: 'REC-901234', studentId: 'st-1', totalPaid: 3500, generatedAt: new Date() },
-        { id: 'rec-2', receiptNumber: 'REC-901235', studentId: 'st-2', totalPaid: 2500, generatedAt: new Date() },
-      ],
-    };
-  }
+  return toClientData({
+    currentMonthInvoiced: Number(invoiced._sum.totalAmount ?? 0),
+    currentMonthCollected: Number(collected._sum.totalPaid ?? 0),
+    currentMonthDue: Number(due._sum.dueAmount ?? 0),
+    examFeeCollected: Number(examCollected._sum.paidAmount ?? 0),
+    todayPaymentsCount: today._count.id,
+    todayPaymentsAmount: Number(today._sum.totalPaid ?? 0),
+    recentReceipts,
+  });
 }
 
 // -------------------------------------------------------------
 // ADMIT CARD CLEARANCE CHECK
 // -------------------------------------------------------------
 
-export async function checkAdmitCardEligibility(studentId: string, schoolId: string = 'school-1') {
+export async function checkAdmitCardEligibility(studentId: string, schoolId: string) {
   try {
     // Check school setting: require_exam_fee_payment_for_admit_card
     const requireExamFeeSetting = true; // Enabled by default in setting

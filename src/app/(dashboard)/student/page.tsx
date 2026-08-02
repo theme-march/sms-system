@@ -1,159 +1,128 @@
-'use client';
+import { Calendar, FileText, Receipt, BookOpen, ShieldCheck, UserRoundCheck } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import prisma from '@/src/lib/db/prisma';
+import { getCurrentSession } from '@/src/lib/auth/session';
+import { formatCurrency } from '@/src/lib/utils';
+import { PortalFees } from '@/src/components/fees/PortalFees';
 
-import React, { useState, useEffect } from 'react';
-import { GraduationCap, Calendar, FileText, Receipt, BookOpen, Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
-import { getStudents } from '@/src/services/student.service';
+export default async function StudentPortalDashboard() {
+  const session = await getCurrentSession();
+  if (!session) redirect('/login');
 
-export default function StudentPortalDashboard() {
-  const [student, setStudent] = useState<any>(null);
+  const student = await prisma.student.findFirst({
+    where: { userId: session.id, schoolId: session.schoolId ?? undefined, status: 'ACTIVE' },
+    include: {
+      class: { select: { name: true } },
+      section: { select: { name: true } },
+      enrollments: {
+        include: {
+          academicYear: { select: { name: true } },
+          class: { select: { name: true } },
+          section: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
+    },
+  });
 
-  useEffect(() => {
-    async function loadStudentData() {
-      const res = await getStudents({});
-      if (res.data.length > 0) {
-        setStudent(res.data[0]);
-      }
-    }
-    loadStudentData();
-  }, []);
+  if (!student) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-5 pt-10">
+        <div className="flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs font-semibold text-teal-900">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-teal-600" />
+          Student portal access is active and isolated to your own academic record.
+        </div>
+        <section className="rounded-2xl border border-amber-200 bg-white p-8 text-center shadow-sm">
+          <UserRoundCheck className="mx-auto h-12 w-12 text-amber-500" />
+          <h1 className="mt-4 text-xl font-bold text-slate-900">Welcome, {session.name}</h1>
+          <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
+            Login was successful, but this user account is not linked to a student profile yet. Ask the School Admin to link this login from the Student Directory.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const enrollment = student.enrollments[0];
+  const classId = enrollment?.classId ?? student.classId;
+  const sectionId = enrollment?.sectionId ?? student.sectionId;
+
+  const [attendanceTotal, presentTotal, feeTotals, homeworkCount, upcomingRoutine] = await Promise.all([
+    prisma.attendance.count({ where: { studentId: student.id } }),
+    prisma.attendance.count({ where: { studentId: student.id, status: 'PRESENT' } }),
+    prisma.feeInvoice.aggregate({
+      where: { studentId: student.id, schoolId: student.schoolId },
+      _sum: { amount: true, discount: true, paidAmount: true },
+    }),
+    classId && sectionId
+      ? prisma.homework.count({ where: { classId, sectionId, dueDate: { gte: today } } })
+      : Promise.resolve(0),
+    classId
+      ? prisma.examRoutine.findFirst({
+          where: {
+            schoolId: student.schoolId,
+            classId,
+            examDate: { gte: today },
+            status: 'PUBLISHED',
+            ...(sectionId ? { OR: [{ sectionId }, { sectionId: null }] } : {}),
+          },
+          orderBy: { examDate: 'asc' },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const upcomingExam = upcomingRoutine
+    ? await prisma.exam.findFirst({ where: { id: upcomingRoutine.examId, schoolId: student.schoolId }, select: { name: true } })
+    : null;
+  const attendanceRate = attendanceTotal > 0 ? (presentTotal / attendanceTotal) * 100 : 0;
+  const invoiced = Number(feeTotals._sum.amount ?? 0) - Number(feeTotals._sum.discount ?? 0);
+  const paid = Number(feeTotals._sum.paidAmount ?? 0);
+  const due = Math.max(0, invoiced - paid);
+  const className = enrollment?.class.name ?? student.class?.name ?? 'Not assigned';
+  const sectionName = enrollment?.section.name ?? student.section?.name ?? 'Not assigned';
+  const rollNumber = enrollment?.rollNumber ?? student.rollNumber;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-6">
-      {/* Scope Restriction Notification */}
-      <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs font-semibold text-teal-900 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-teal-600 shrink-0" />
-          <span>Server Access Enforcement: Student portal is strictly isolated to own academic record & class routines.</span>
-        </div>
-        <span className="text-[10px] bg-teal-200 text-teal-800 px-2 py-0.5 rounded-md font-bold uppercase">Role: Student</span>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex items-center justify-between rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs font-semibold text-teal-900">
+        <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-teal-600" />Student portal is isolated to your own academic record.</span>
+        <span className="rounded-md bg-teal-200 px-2 py-0.5 text-[10px] font-bold uppercase text-teal-800">Student</span>
       </div>
 
-      {/* Admit Card Clearance Check Banner */}
-      <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
-        <div className="flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <div>
-            <p className="font-bold text-emerald-900">Exam Admit Card Eligibility: CLEARED</p>
-            <p className="text-[11px] text-emerald-700">All term exam fees cleared for 1st Term Final Examination 2026. Admit card is available for download.</p>
-          </div>
-        </div>
-        <button className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0">
-          Download Admit Card
-        </button>
-      </div>
-
-      {/* Student Welcome Banner */}
-      <div className="bg-teal-700 text-white rounded-2xl p-6 sm:p-8 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <section className="flex flex-col justify-between gap-5 rounded-2xl bg-teal-700 p-6 text-white shadow-md sm:flex-row sm:items-center sm:p-8">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-white text-teal-700 flex items-center justify-center font-black text-2xl shadow-sm shrink-0">
-            {student?.nameEn?.[0] || 'T'}
-          </div>
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white text-2xl font-black text-teal-700">{student.nameEn.charAt(0)}</div>
           <div>
-            <h1 className="text-xl font-bold">Welcome back, {student?.nameEn || 'Tanvir Hossain'}!</h1>
-            <p className="text-xs text-teal-100 mt-1">
-              Class 10 — Padma Section | Roll Number: <strong className="text-white">#1</strong> | Code: <strong className="text-white">{student?.studentCode || 'STU-2026-1001'}</strong>
-            </p>
+            <h1 className="text-xl font-bold">Welcome back, {student.nameEn}!</h1>
+            <p className="mt-1 text-xs text-teal-100">Class {className} · Section {sectionName} · Roll {rollNumber ?? 'Not assigned'} · {student.studentCode}</p>
           </div>
         </div>
-
-        <div className="bg-white/10 p-4 rounded-xl text-xs space-y-1 backdrop-blur-xs border border-white/10">
-          <p className="text-teal-100 text-[10px] uppercase font-bold">Current Academic Year</p>
-          <p className="font-bold text-sm">Academic Year 2026</p>
+        <div className="rounded-xl border border-white/10 bg-white/10 p-4 text-xs">
+          <p className="text-[10px] font-bold uppercase text-teal-100">Academic year</p>
+          <p className="mt-1 text-sm font-bold">{enrollment?.academicYear.name ?? 'Not assigned'}</p>
         </div>
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric icon={Calendar} label="Attendance" value={attendanceTotal ? `${attendanceRate.toFixed(1)}%` : 'No records'} detail={`${presentTotal} present · ${attendanceTotal - presentTotal} absent/other`} />
+        <Metric icon={Receipt} label="Outstanding fees" value={formatCurrency(due)} detail={`${formatCurrency(paid)} collected`} />
+        <Metric icon={BookOpen} label="Assigned homework" value={String(homeworkCount)} detail="Current and upcoming work" />
+        <Metric icon={FileText} label="Upcoming exam" value={upcomingExam?.name ?? 'No upcoming exam'} detail={upcomingRoutine ? upcomingRoutine.examDate.toLocaleDateString('en-GB') : 'No published routine'} />
       </div>
-
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between text-teal-600">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Attendance</span>
-            <Calendar className="w-4 h-4" />
-          </div>
-          <p className="text-2xl font-black text-slate-900">96.4%</p>
-          <p className="text-[11px] text-emerald-600 font-bold">120 Days Present | 4 Absent</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between text-teal-600">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Pending Invoices</span>
-            <Receipt className="w-4 h-4" />
-          </div>
-          <p className="text-2xl font-black text-slate-900">৳0.00</p>
-          <p className="text-[11px] text-slate-500 font-medium">All fees clear for Jan 2026</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between text-teal-600">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Assigned Homework</span>
-            <BookOpen className="w-4 h-4" />
-          </div>
-          <p className="text-2xl font-black text-slate-900">3</p>
-          <p className="text-[11px] text-amber-600 font-bold">Due by Friday</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between text-teal-600">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Upcoming Exam</span>
-            <FileText className="w-4 h-4" />
-          </div>
-          <p className="text-base font-bold text-slate-900 truncate">1st Term Exam</p>
-          <p className="text-[11px] text-teal-700 font-bold">Starts Feb 15, 2026</p>
-        </div>
-      </div>
-
-      {/* Routine & Notice Board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Today's Class Routine */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-teal-600" />
-            Today's Class Schedule (Class 10 - Padma)
-          </h3>
-          <div className="space-y-2 text-xs">
-            <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between border border-slate-200">
-              <div>
-                <p className="font-bold text-slate-900">Higher Mathematics</p>
-                <p className="text-[10px] text-slate-500">Teacher: Mr. Rafiqul Islam | Room 302</p>
-              </div>
-              <span className="px-2.5 py-1 bg-teal-100 text-teal-800 rounded-lg font-bold text-[10px]">09:00 AM - 09:45 AM</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between border border-slate-200">
-              <div>
-                <p className="font-bold text-slate-900">Physics</p>
-                <p className="text-[10px] text-slate-500">Teacher: Dr. Nazmul Hossain | Science Lab 1</p>
-              </div>
-              <span className="px-2.5 py-1 bg-teal-100 text-teal-800 rounded-lg font-bold text-[10px]">09:45 AM - 10:30 AM</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between border border-slate-200">
-              <div>
-                <p className="font-bold text-slate-900">English First Paper</p>
-                <p className="text-[10px] text-slate-500">Teacher: Mrs. Nusrat Jahan | Room 302</p>
-              </div>
-              <span className="px-2.5 py-1 bg-teal-100 text-teal-800 rounded-lg font-bold text-[10px]">10:30 AM - 11:15 AM</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Notices */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-teal-600" />
-            Student Notices & Announcements
-          </h3>
-          <div className="space-y-3 text-xs">
-            <div className="p-3 bg-teal-50/50 border border-teal-100 rounded-xl space-y-1">
-              <span className="text-[10px] font-bold text-teal-700 uppercase">Jan 15, 2026</span>
-              <p className="font-bold text-slate-900">Science Fair Project Registration Open</p>
-              <p className="text-slate-600">All students of Class 9 & 10 must register their project abstracts before January 25.</p>
-            </div>
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Jan 10, 2026</span>
-              <p className="font-bold text-slate-900">1st Term Examination Schedule</p>
-              <p className="text-slate-600">Class routines and admit cards will be issued from February 1st.</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PortalFees studentId={student.id} />
     </div>
+  );
+}
+
+function Metric({ icon: Icon, label, value, detail }: { icon: typeof Calendar; label: string; value: string; detail: string }) {
+  return (
+    <section className="space-y-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between"><span className="text-[10px] font-bold uppercase text-slate-400">{label}</span><Icon className="h-4 w-4 text-teal-600" /></div>
+      <p className="truncate text-xl font-black text-slate-900">{value}</p>
+      <p className="text-[11px] font-medium text-slate-500">{detail}</p>
+    </section>
   );
 }

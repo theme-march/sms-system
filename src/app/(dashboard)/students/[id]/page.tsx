@@ -77,8 +77,8 @@ export default function StudentDetailPage() {
               Admission #: <span className="font-bold text-teal-700">{student.admissionNumber}</span> | Code: <span className="font-bold text-slate-800">{student.studentCode}</span>
             </p>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 mt-3 font-semibold">
-              <span className="px-2.5 py-1 bg-slate-100 rounded-lg">Class: {student.class?.name || 'Class 10'}</span>
-              <span className="px-2.5 py-1 bg-slate-100 rounded-lg">Section: {student.section?.name || 'Padma'}</span>
+              <span className="px-2.5 py-1 bg-slate-100 rounded-lg">Class: {student.class?.name || '—'}</span>
+              <span className="px-2.5 py-1 bg-slate-100 rounded-lg">Section: {student.section?.name || '—'}</span>
               <span className="px-2.5 py-1 bg-teal-100 text-teal-800 rounded-lg">Roll #: {student.rollNumber || 1}</span>
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function StudentDetailPage() {
           </p>
           <p className="flex items-center gap-2 text-slate-700">
             <Mail className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-            <span className="font-semibold">{student.email || 'tanvir@student.edu.bd'}</span>
+            <span className="font-semibold">{student.email || '—'}</span>
           </p>
           <p className="flex items-center gap-2 text-slate-700">
             <MapPin className="w-3.5 h-3.5 text-teal-600 shrink-0" />
@@ -205,21 +205,15 @@ export default function StudentDetailPage() {
               {student.enrollments && student.enrollments.length > 0 ? (
                 student.enrollments.map((enr: any) => (
                   <tr key={enr.id}>
-                    <td className="p-3 font-bold text-teal-700">{enr.academicYear?.name || 'Academic Year 2026'}</td>
-                    <td className="p-3 font-semibold text-slate-800">{enr.class?.name || 'Class 10'} ({enr.section?.name || 'Padma'})</td>
-                    <td className="p-3 font-bold text-slate-900">#{enr.rollNumber || 1}</td>
+                    <td className="p-3 font-bold text-teal-700">{enr.academicYear?.name || '—'}</td>
+                    <td className="p-3 font-semibold text-slate-800">{enr.class?.name || '—'} ({enr.section?.name || '—'})</td>
+                    <td className="p-3 font-bold text-slate-900">{enr.rollNumber ?? '—'}</td>
                     <td className="p-3 text-slate-600">{enr.enrollmentType || 'REGULAR'}</td>
                     <td className="p-3"><StatusBadge status={enr.enrollmentStatus || 'ACTIVE'} /></td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td className="p-3 font-bold text-teal-700">Academic Year 2026</td>
-                  <td className="p-3 font-semibold text-slate-800">Class 10 (Padma)</td>
-                  <td className="p-3 font-bold text-slate-900">#1</td>
-                  <td className="p-3 text-slate-600">REGULAR</td>
-                  <td className="p-3"><StatusBadge status="ACTIVE" /></td>
-                </tr>
+                <tr><td colSpan={5} className="p-8 text-center text-slate-400">No enrollment records found.</td></tr>
               )}
             </tbody>
           </table>
@@ -236,7 +230,7 @@ export default function StudentDetailPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Blood Group</p>
-              <p className="font-bold text-rose-700 text-sm mt-0.5">{student.bloodGroup || 'B+'}</p>
+              <p className="font-bold text-rose-700 text-sm mt-0.5">{student.bloodGroup || '—'}</p>
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Height</p>

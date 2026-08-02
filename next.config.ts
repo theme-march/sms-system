@@ -4,14 +4,16 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   images: {
-    domains: ['images.unsplash.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
   },
   async rewrites() {
     return [
-      {
-        source: '/dashboard/:path*',
-        destination: '/:path*',
-      },
+      { source: '/dashboard/:path+', destination: '/:path+' },
     ];
   },
 };

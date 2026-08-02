@@ -12,8 +12,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { academicYearSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function AcademicYearsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<AcademicYearRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export function AcademicYearsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 
@@ -367,7 +369,7 @@ export function AcademicYearsManager() {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Academic Year 2026"
+                  placeholder="Academic year name"
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-teal-600"
                 />
                 {formErrors.name && (

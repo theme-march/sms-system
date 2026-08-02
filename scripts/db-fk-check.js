@@ -1,0 +1,42 @@
+const dotenv = require('dotenv');
+const mysql = require('mysql2/promise');
+const url = require('url');
+
+dotenv.config();
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error('DATABASE_URL not set');
+  process.exit(2);
+}
+
+(async () => {
+  try {
+    const parsed = new url.URL(DATABASE_URL);
+    const user = parsed.username || 'root';
+    const password = parsed.password || '';
+    const host = parsed.hostname || 'localhost';
+    const port = parsed.port || 3306;
+    const database = parsed.pathname ? parsed.pathname.replace(/^\//, '') : undefined;
+
+    const conn = await mysql.createConnection({ host, port, user, password, database });
+
+    const [fks] = await conn.execute(
+      `SELECT CONSTRAINT_NAME, TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+       FROM information_schema.KEY_COLUMN_USAGE
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL`,
+      [database, 'teacher_assignments']
+    );
+
+    const [allRefs] = await conn.execute(
+      `SELECT * FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = ? AND TABLE_NAME = ?`,
+      [database, 'teacher_assignments']
+    );
+
+    console.log('fks:', JSON.stringify(fks, null, 2));
+    console.log('refs:', JSON.stringify(allRefs, null, 2));
+    await conn.end();
+  } catch (err) {
+    console.error('ERROR:', err.message);
+    process.exit(3);
+  }
+})();

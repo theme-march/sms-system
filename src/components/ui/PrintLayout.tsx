@@ -10,10 +10,10 @@ interface PrintLayoutProps {
 }
 
 export function PrintLayout({
-  schoolName = 'Dhaka Ideal Model High School & College',
-  eiin = '108234',
-  address = 'Uttara, Dhaka-1230, Bangladesh',
-  phone = '+880 2 8951234',
+  schoolName = 'School Management System',
+  eiin = '',
+  address = '',
+  phone = '',
   documentTitle,
   children,
 }: PrintLayoutProps) {
@@ -22,8 +22,7 @@ export function PrintLayout({
       {/* Official Header */}
       <div className="text-center border-b border-slate-200 pb-4 mb-6">
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{schoolName}</h1>
-        <p className="text-xs font-semibold text-teal-700 mt-0.5">EIIN: {eiin} | Reg No: SCH-001</p>
-        <p className="text-xs text-slate-500 mt-0.5">{address} | Tel: {phone}</p>
+        {(eiin || address || phone) && <p className="text-xs font-semibold text-teal-700 mt-0.5">{[eiin && `EIIN: ${eiin}`, address, phone && `Tel: ${phone}`].filter(Boolean).join(' | ')}</p>}
         <div className="mt-3 inline-block px-4 py-1 bg-slate-100 rounded-full text-xs font-bold uppercase tracking-wider text-slate-800">
           {documentTitle}
         </div>

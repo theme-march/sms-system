@@ -22,7 +22,7 @@ import {
   Building2,
   CheckCircle,
 } from 'lucide-react';
-import { getTeacherById } from '@/src/services/staff.service';
+import { addEmploymentHistory, addStaffDocument, getTeacherById } from '@/src/services/staff.service';
 
 export default function TeacherDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -63,41 +63,22 @@ export default function TeacherDetailPage({ params }: { params: Promise<{ id: st
     fetchTeacher();
   }, [id]);
 
-  const handleAddDocument = (e: React.FormEvent) => {
+  const handleAddDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docData.title || !docData.fileUrl) return;
 
-    const newDoc = {
-      id: `doc-${Date.now()}`,
-      title: docData.title,
-      documentType: docData.documentType,
-      fileUrl: docData.fileUrl,
-      uploadedAt: new Date().toISOString().split('T')[0],
-    };
-
-    setTeacher((prev: any) => ({
-      ...prev,
-      documents: [...(prev.documents || []), newDoc],
-    }));
-
+    await addStaffDocument({ teacherId: id }, docData);
+    await fetchTeacher();
     setDocModalOpen(false);
     setDocData({ title: '', documentType: 'Educational Certificate', fileUrl: '' });
   };
 
-  const handleAddHistory = (e: React.FormEvent) => {
+  const handleAddHistory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!histData.companyName || !histData.designation) return;
 
-    const newHist = {
-      id: `hist-${Date.now()}`,
-      ...histData,
-    };
-
-    setTeacher((prev: any) => ({
-      ...prev,
-      employmentHistories: [...(prev.employmentHistories || []), newHist],
-    }));
-
+    await addEmploymentHistory({ teacherId: id }, histData);
+    await fetchTeacher();
     setHistModalOpen(false);
     setHistData({ companyName: '', designation: '', startDate: '', endDate: '', responsibilities: '' });
   };
@@ -125,7 +106,7 @@ export default function TeacherDetailPage({ params }: { params: Promise<{ id: st
   const name = teacher.nameEn || teacher.user?.name || 'Teacher Profile';
   const desigName = teacher.designation?.nameEn || teacher.designation || 'Faculty Member';
   const deptName = teacher.department?.nameEn || 'General Department';
-  const code = teacher.employeeCode || teacher.employeeId || 'EMP-T-001';
+  const code = teacher.employeeCode || teacher.employeeId || '—';
 
   return (
     <div className="space-y-6">

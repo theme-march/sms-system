@@ -1,8 +1,12 @@
 import React from 'react';
 import { prisma } from '../../../../lib/prisma';
+import { getCurrentSession } from '@/src/lib/auth/session';
+import { redirect } from 'next/navigation';
 
 export default async function HRPayrollManagement() {
-  const schoolId = 'school-1';
+  const session = await getCurrentSession();
+  if (!session?.schoolId) redirect('/login');
+  const schoolId = session.schoolId;
 
   const payrollPeriods = await prisma.payrollPeriod.findMany({
     where: { schoolId },

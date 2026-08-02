@@ -138,7 +138,7 @@ export default function OnlineAdmissionPage() {
               <School className="w-7 h-7" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Dhaka Ideal Model High School & College</h1>
+              <h1 className="text-xl font-bold tracking-tight">Online Admission Portal</h1>
               <p className="text-xs text-teal-100 font-medium">Online Admission Portal & Student Application — Session 2026</p>
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function OnlineAdmissionPage() {
                   value={formData.studentNameEn}
                   onChange={handleChange}
                   required
-                  placeholder="e.g. Tanvir Hossain"
+                  placeholder="Applicant's full name"
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-teal-500"
                 />
               </div>

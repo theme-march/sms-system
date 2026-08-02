@@ -19,50 +19,15 @@ export interface SchoolSettingsUpdateInput {
 }
 
 export async function getSchoolProfile(schoolId?: string) {
-  try {
-    const school = await prisma.school.findFirst({
-      include: {
-        settings: true,
-        branding: true,
-      },
-    });
-
-    if (school) return school;
-  } catch {
-    // Graceful fallback profile for initial seed / live preview
-  }
-
-  // Graceful fallback profile for initial seed / live preview
-  return {
-    id: 'demo-school-id',
-    code: 'SCH-001',
-    name: 'Dhaka Ideal Model High School & College',
-    eiin: '108234',
-    principalName: 'Prof. Dr. Mohammad Rahman',
-    address: 'Plot 12, Road 4, Sector 7, Uttara, Dhaka-1230, Bangladesh',
-    phone: '+880 2 8951234',
-    email: 'info@dhakaideal.edu.bd',
-    website: 'https://dhakaideal.edu.bd',
-    status: 'ACTIVE',
-    settings: {
-      currency: 'BDT',
-      timezone: 'Asia/Dhaka',
-      dateFormat: 'DD/MM/YYYY',
-      defaultLanguage: 'bn',
-      academicYear: '2026',
-    },
-    branding: {
-      logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=150',
-      faviconUrl: '/favicon.ico',
-      primaryColor: '#0d9488',
-      accentColor: '#0f766e',
-    },
-  };
+  return prisma.school.findFirst({
+    where: schoolId ? { id: schoolId, deletedAt: null } : { deletedAt: null },
+    include: { settings: true, branding: true },
+  });
 }
 
 export async function updateSchoolProfile(schoolId: string, data: SchoolSettingsUpdateInput, userId?: string) {
-  try {
-    const updated = await prisma.school.update({
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.school.update({
       where: { id: schoolId },
       data: {
         name: data.name,
@@ -111,7 +76,7 @@ export async function updateSchoolProfile(schoolId: string, data: SchoolSettings
     });
 
     // Audit Log Creation
-    await prisma.auditLog.create({
+    await tx.auditLog.create({
       data: {
         schoolId,
         userId,
@@ -123,21 +88,5 @@ export async function updateSchoolProfile(schoolId: string, data: SchoolSettings
     });
 
     return updated;
-  } catch {
-    return {
-      id: schoolId,
-      ...data,
-      settings: {
-        currency: data.currency || 'BDT',
-        timezone: data.timezone || 'Asia/Dhaka',
-        dateFormat: data.dateFormat || 'DD/MM/YYYY',
-        defaultLanguage: data.defaultLanguage || 'bn',
-        academicYear: data.academicYear || '2026',
-      },
-      branding: {
-        logoUrl: data.logoUrl,
-        faviconUrl: data.faviconUrl,
-      },
-    };
-  }
+  });
 }

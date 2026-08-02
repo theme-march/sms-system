@@ -278,6 +278,9 @@ model AuditLog {
   school School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([schoolId, createdAt])
+  @@index([userId, createdAt])
+  @@index([module, action, createdAt])
   @@map("audit_logs")
 }
 
@@ -716,6 +719,14 @@ model TeacherAssignment {
   subject         Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   @@unique([schoolId, academicYearId, classId, sectionId, subjectId, teacherId])
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([sessionId])
+  @@index([teacherId])
+  @@index([classId])
+  @@index([sectionId])
+  @@index([groupId])
+  @@index([subjectId])
   @@map("teacher_assignments")
 }
 
@@ -957,6 +968,8 @@ model AdmissionApplication {
   test      AdmissionTest?
   interview AdmissionInterview?
 
+  @@index([schoolId, status, createdAt])
+  @@index([schoolId, classId, createdAt])
   @@map("admission_applications")
 }
 
@@ -1240,6 +1253,8 @@ model ExamRoutine {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  @@index([schoolId, academicYearId, examDate])
+  @@index([classId, sectionId, subjectId])
   @@map("exam_routines")
 }
 
@@ -1275,6 +1290,9 @@ model StudentAttendanceRecord {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([schoolId, date, status])
+  @@index([studentId, date])
+  @@index([classId, sectionId, date])
   @@map("student_attendance_records")
 }
 
@@ -1501,6 +1519,9 @@ model StudentInvoice {
   items             InvoiceItem[]
 
   @@unique([schoolId, studentId, enrollmentId, feeTypeId, billingYear, billingMonth])
+  @@index([schoolId, billingYear, billingMonth, paymentStatus])
+  @@index([studentId, dueDate])
+  @@index([academicYearId, feeTypeId])
   @@map("student_invoices")
 }
 
@@ -1649,6 +1670,8 @@ model FinancialTransaction {
   transactionDate   DateTime @map("transaction_date")
   createdAt         DateTime @default(now()) @map("created_at")
 
+  @@index([schoolId, transactionDate, transactionType])
+  @@index([schoolId, category, transactionDate])
   @@map("financial_transactions")
 }
 
@@ -1978,6 +2001,8 @@ model LeaveApplication {
   appliedAt     DateTime @default(now()) @map("applied_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  @@index([schoolId, status, appliedAt])
+  @@index([userId, startDate, endDate])
   @@map("leave_applications")
 }
 
@@ -2074,6 +2099,8 @@ model Payroll {
   teacherId        String?
 
   @@unique([payrollPeriodId, userId])
+  @@index([schoolId, status, createdAt])
+  @@index([userId, createdAt])
   @@map("payrolls")
 }
 
@@ -2107,7 +2134,112 @@ model SalaryPayment {
   paymentDate    DateTime @default(now()) @map("payment_date")
   processedById  String   @map("processed_by_id")
 
+  @@index([payrollId, paymentDate])
   @@map("salary_payments")
+}
+
+model ImportHistory {
+  id            String    @id @default(uuid())
+  schoolId      String    @map("school_id")
+  userId        String    @map("user_id")
+  importType    String    @map("import_type")
+  fileName      String    @map("file_name")
+  fileSize      Int       @map("file_size")
+  mimeType      String    @map("mime_type")
+  status        String    @default("VALIDATED")
+  totalRows     Int       @default(0) @map("total_rows")
+  validRows     Int       @default(0) @map("valid_rows")
+  invalidRows   Int       @default(0) @map("invalid_rows")
+  processedRows Int       @default(0) @map("processed_rows")
+  successRows   Int       @default(0) @map("success_rows")
+  failedRows    Int       @default(0) @map("failed_rows")
+  columnMapping Json?     @map("column_mapping")
+  payload       Json?
+  successReport Json?     @map("success_report")
+  errorReport   Json?     @map("error_report")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  completedAt   DateTime? @map("completed_at")
+
+  @@index([schoolId, importType, createdAt])
+  @@index([userId, createdAt])
+  @@map("import_histories")
+}
+
+model ExportHistory {
+  id          String    @id @default(uuid())
+  schoolId    String    @map("school_id")
+  userId      String    @map("user_id")
+  reportType  String    @map("report_type")
+  format      String
+  filters     Json?
+  status      String    @default("COMPLETED")
+  rowCount    Int       @default(0) @map("row_count")
+  fileName    String?   @map("file_name")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([schoolId, reportType, createdAt])
+  @@index([userId, createdAt])
+  @@map("export_histories")
+}
+
+model LegacyInstallmentImport {
+  id              String   @id @default(uuid())
+  importHistoryId String   @unique @map("import_history_id")
+  schoolId        String   @map("school_id")
+  importedById    String   @map("imported_by_id")
+  sourceName      String   @map("source_name")
+  status          String   @default("ISOLATED")
+  recordCount     Int      @default(0) @map("record_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  installments LegacyInstallment[]
+
+  @@index([schoolId, createdAt])
+  @@map("legacy_installment_imports")
+}
+
+model LegacyInstallment {
+  id                String    @id @default(uuid())
+  legacyImportId    String    @map("legacy_import_id")
+  schoolId          String    @map("school_id")
+  studentId         String?   @map("student_id")
+  legacyStudentRef  String    @map("legacy_student_ref")
+  academicYearLabel String?   @map("academic_year_label")
+  installmentName   String    @map("installment_name")
+  amount            Decimal   @db.Decimal(12, 2)
+  dueDate           DateTime? @map("due_date")
+  status            String    @default("UNPAID")
+  sourceRow         Int       @map("source_row")
+  migrationStatus   String    @default("ISOLATED") @map("migration_status")
+  migratedInvoiceId String?   @map("migrated_invoice_id")
+  authorizedById    String?   @map("authorized_by_id")
+  migratedAt        DateTime? @map("migrated_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  legacyImport LegacyInstallmentImport    @relation(fields: [legacyImportId], references: [id], onDelete: Cascade)
+  payments     LegacyInstallmentPayment[]
+
+  @@index([schoolId, legacyStudentRef])
+  @@index([schoolId, migrationStatus])
+  @@index([studentId])
+  @@map("legacy_installments")
+}
+
+model LegacyInstallmentPayment {
+  id                  String   @id @default(uuid())
+  legacyInstallmentId String   @map("legacy_installment_id")
+  amount              Decimal  @db.Decimal(12, 2)
+  paymentDate         DateTime @map("payment_date")
+  paymentMethod       String   @map("payment_method")
+  reference           String?
+  sourceRow           Int?     @map("source_row")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  legacyInstallment LegacyInstallment @relation(fields: [legacyInstallmentId], references: [id], onDelete: Cascade)
+
+  @@index([legacyInstallmentId, paymentDate])
+  @@map("legacy_installment_payments")
 }
 
 model Payslip {

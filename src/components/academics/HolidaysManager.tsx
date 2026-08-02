@@ -12,8 +12,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { holidaySchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function HolidaysManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<HolidayRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +105,7 @@ export function HolidaysManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 

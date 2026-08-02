@@ -30,8 +30,10 @@ import {
   deleteTeacher,
 } from '@/src/services/staff.service';
 import { teacherSchema } from '@/src/lib/validations/staff';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export default function TeachersPage() {
+  const { schoolId } = useSchoolContext();
   const [loading, setLoading] = useState(true);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -51,7 +53,7 @@ export default function TeachersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
   const [formData, setFormData] = useState({
-    schoolId: 'sch-ideal-101',
+    schoolId,
     employeeCode: '',
     nameEn: '',
     nameBn: '',
@@ -59,14 +61,14 @@ export default function TeachersPage() {
     email: '',
     gender: 'MALE',
     dateOfBirth: '',
-    joiningDate: '2026-01-01',
+    joiningDate: new Date().toISOString().slice(0, 10),
     qualification: '',
     specialization: '',
     departmentId: '',
     designationId: '',
     employmentStatus: 'PERMANENT',
     status: 'ACTIVE',
-    salary: 50000,
+    salary: 0,
   });
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -107,22 +109,22 @@ export default function TeachersPage() {
   const handleOpenRecruitModal = () => {
     setEditingTeacher(null);
     setFormData({
-      schoolId: 'sch-ideal-101',
-      employeeCode: `EMP-T-00${Math.floor(Math.random() * 90) + 10}`,
+      schoolId,
+      employeeCode: '',
       nameEn: '',
       nameBn: '',
       phone: '',
       email: '',
       gender: 'MALE',
-      dateOfBirth: '1990-01-01',
-      joiningDate: '2026-01-01',
+      dateOfBirth: '',
+      joiningDate: new Date().toISOString().slice(0, 10),
       qualification: '',
       specialization: '',
       departmentId: departments[0]?.id || '',
       designationId: designations[0]?.id || '',
       employmentStatus: 'PERMANENT',
       status: 'ACTIVE',
-      salary: 50000,
+      salary: 0,
     });
     setFormError('');
     setIsModalOpen(true);
@@ -131,7 +133,7 @@ export default function TeachersPage() {
   const handleOpenEditModal = (tch: any) => {
     setEditingTeacher(tch);
     setFormData({
-      schoolId: tch.schoolId || 'sch-ideal-101',
+      schoolId: tch.schoolId || schoolId,
       employeeCode: tch.employeeCode || tch.employeeId || '',
       nameEn: tch.nameEn || tch.user?.name || '',
       nameBn: tch.nameBn || '',
@@ -288,7 +290,7 @@ export default function TeachersPage() {
             const name = tch.nameEn || tch.user?.name || 'Teacher';
             const desigName = tch.designation?.nameEn || tch.designation || 'Faculty Member';
             const deptName = tch.department?.nameEn || 'General Department';
-            const code = tch.employeeCode || tch.employeeId || 'EMP-T-001';
+            const code = tch.employeeCode || tch.employeeId || '—';
 
             return (
               <div

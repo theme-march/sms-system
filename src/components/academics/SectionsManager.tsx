@@ -12,8 +12,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { sectionSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function SectionsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<SectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export function SectionsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       displayOrder: 0,
       ...formData,
     };

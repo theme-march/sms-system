@@ -2,18 +2,65 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit2, Trash2, CheckCircle2, XCircle, AlertCircle, BookOpen } from 'lucide-react';
-import {
-  getSubjectsList,
-  createSubject,
-  updateSubject,
-  toggleSubjectStatus,
-  deleteSubject,
-  SubjectRecord,
-} from '@/src/services/academic-management.service';
+// Client-side API wrappers for subjects (call server route handlers)
+const apiBase = '/api/academic/subjects';
+
+async function fetchSubjects(params: any) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.pageSize) qs.set('pageSize', String(params.pageSize));
+  if (params.search) qs.set('search', params.search);
+  if (params.status) qs.set('status', params.status);
+  if (params.subjectType) qs.set('subjectType', params.subjectType);
+  const res = await fetch(`${apiBase}?${qs.toString()}`, { cache: 'no-store' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'Failed to load subjects');
+  }
+  return res.json();
+}
+
+async function createSubjectApi(payload: any) {
+  const res = await fetch(apiBase, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'Create failed');
+  }
+  return res.json();
+}
+
+async function updateSubjectApi(id: string, payload: any) {
+  const res = await fetch(`${apiBase}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error('Update failed');
+  return res.json();
+}
+
+async function toggleSubjectApi(id: string) {
+  const res = await fetch(`${apiBase}/${id}`, { method: 'PATCH' });
+  if (!res.ok) throw new Error('Toggle failed');
+  return res.json();
+}
+
+async function deleteSubjectApi(id: string) {
+  const res = await fetch(`${apiBase}/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Delete failed');
+  return res.json();
+}
+
+export type SubjectRecord = {
+  id: string;
+  schoolId: string;
+  code: string;
+  nameEn: string;
+  nameBn?: string;
+  subjectType?: string;
+  status?: string;
+};
 import { subjectSchema } from '@/src/lib/validations/academic';
-import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function SubjectsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<SubjectRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +91,12 @@ export function SubjectsManager() {
     setLoading(true);
     setError(null);
     try {
-      const res = await getSubjectsList({
+      const res = await fetchSubjects({
         page,
         pageSize,
         search,
         status: statusFilter,
+        subjectType: typeFilter,
       });
       setData(res.data);
       setTotalPages(res.totalPages);
@@ -62,7 +110,7 @@ export function SubjectsManager() {
 
   useEffect(() => {
     loadData();
-  }, [page, pageSize, search, statusFilter]);
+  }, [page, pageSize, search, statusFilter, typeFilter]);
 
   const showNotification = (msg: string) => {
     setSuccessMsg(msg);
@@ -72,9 +120,9 @@ export function SubjectsManager() {
   const handleOpenCreate = () => {
     setEditingItem(null);
     setFormData({
-      nameEn: 'Advanced Physics',
-      nameBn: 'উচ্চতর পদার্থবিজ্ঞান',
-      code: 'PHY-101',
+      nameEn: '',
+      nameBn: '',
+      code: '',
       subjectType: 'compulsory',
       status: 'ACTIVE',
     });
@@ -88,8 +136,8 @@ export function SubjectsManager() {
       nameEn: item.nameEn,
       nameBn: item.nameBn || '',
       code: item.code,
-      subjectType: item.subjectType || 'compulsory',
-      status: item.status,
+    subjectType: (item.subjectType as any) || 'compulsory',
+    status: (item.status as 'ACTIVE' | 'INACTIVE') || 'ACTIVE',
     });
     setFormErrors({});
     setIsModalOpen(true);
@@ -100,11 +148,10 @@ export function SubjectsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
       ...formData,
     };
 
-    const validation = subjectSchema.safeParse(payload);
+    const validation = subjectSchema.safeParse({ ...payload, schoolId });
     if (!validation.success) {
       const errors: Record<string, string> = {};
       validation.error.issues.forEach((issue) => {
@@ -118,22 +165,10 @@ export function SubjectsManager() {
 
     try {
       if (editingItem) {
-        await updateSubject(editingItem.id, payload);
-        await createAuditLog({
-          action: 'UPDATE',
-          module: 'Subjects',
-          recordId: editingItem.id,
-          details: `Updated subject ${formData.nameEn}`,
-        });
+        await updateSubjectApi(editingItem.id, payload);
         showNotification('Subject updated successfully');
       } else {
-        const created = await createSubject(payload);
-        await createAuditLog({
-          action: 'CREATE',
-          module: 'Subjects',
-          recordId: created.id,
-          details: `Created subject ${formData.nameEn}`,
-        });
+        await createSubjectApi(payload);
         showNotification('Subject created successfully');
       }
       setIsModalOpen(false);
@@ -145,13 +180,7 @@ export function SubjectsManager() {
 
   const handleToggleStatus = async (item: SubjectRecord) => {
     try {
-      await toggleSubjectStatus(item.id);
-      await createAuditLog({
-        action: 'TOGGLE_STATUS',
-        module: 'Subjects',
-        recordId: item.id,
-        details: `Toggled status for subject ${item.nameEn}`,
-      });
+      await toggleSubjectApi(item.id);
       showNotification('Subject status updated');
       loadData();
     } catch (err: any) {
@@ -162,13 +191,7 @@ export function SubjectsManager() {
   const handleDelete = async (item: SubjectRecord) => {
     if (!confirm(`Are you sure you want to delete ${item.nameEn}?`)) return;
     try {
-      await deleteSubject(item.id);
-      await createAuditLog({
-        action: 'DELETE',
-        module: 'Subjects',
-        recordId: item.id,
-        details: `Deleted subject ${item.nameEn}`,
-      });
+      await deleteSubjectApi(item.id);
       showNotification('Subject deleted');
       loadData();
     } catch (err: any) {
@@ -225,11 +248,10 @@ export function SubjectsManager() {
             className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
           >
             <option value="">All Subject Types</option>
-            <option value="THEORY">Theory</option>
-            <option value="PRACTICAL">Practical</option>
-            <option value="BOTH">Both (Theory & Practical)</option>
-            <option value="COMPULSORY">Compulsory</option>
-            <option value="OPTIONAL">Optional</option>
+            <option value="compulsory">Compulsory</option>
+            <option value="optional">Optional</option>
+            <option value="additional">Additional</option>
+            <option value="practical">Practical</option>
           </select>
 
           <select

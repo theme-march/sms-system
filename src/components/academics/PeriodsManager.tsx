@@ -12,8 +12,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { periodSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function PeriodsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<PeriodRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +104,7 @@ export function PeriodsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 

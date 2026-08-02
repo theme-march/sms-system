@@ -7,8 +7,8 @@ import { FormField } from '@/src/components/forms/FormField';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@school.com');
-  const [password, setPassword] = useState('AdminPassword123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -18,14 +18,22 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Simulate authentication check or call auth API
-      if (email === 'admin@school.com' && password) {
-        document.cookie = `school_session=demo-admin-token; path=/; max-age=604800`;
-        router.push('/dashboard');
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        const nextPath = new URLSearchParams(window.location.search).get('next');
+        router.replace(nextPath?.startsWith('/') ? nextPath : data.redirectTo || '/dashboard');
+        router.refresh();
       } else {
-        setError('Invalid credentials. Use admin@school.com');
+        setError(data?.error || 'Invalid credentials.');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -41,7 +49,7 @@ export default function LoginPage() {
             <School className="w-6 h-6" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Dhaka Ideal Model High School
+            School Management System
           </h1>
           <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider">
             Management Console Portal
@@ -78,9 +86,7 @@ export default function LoginPage() {
               <input type="checkbox" defaultChecked className="rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
               <span>Remember session</span>
             </label>
-            <a href="#" className="text-teal-600 hover:underline font-medium">
-              Forgot password?
-            </a>
+            <span className="text-slate-400">7-day secure session</span>
           </div>
 
           <button
@@ -93,13 +99,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 text-[11px] text-slate-500 space-y-1">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-            <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-            <span>Seed Super Admin Credentials:</span>
-          </div>
-          <p>Email: <code className="text-teal-700 font-bold">admin@school.com</code></p>
-          <p>Password: <code className="text-teal-700 font-bold">AdminPassword123!</code></p>
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
+          <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+          <span>Your session is encrypted and protected.</span>
         </div>
       </div>
     </div>

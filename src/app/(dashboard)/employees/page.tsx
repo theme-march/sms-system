@@ -28,8 +28,10 @@ import {
   deleteEmployee,
 } from '@/src/services/staff.service';
 import { employeeSchema } from '@/src/lib/validations/staff';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export default function EmployeesPage() {
+  const { schoolId } = useSchoolContext();
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -49,7 +51,7 @@ export default function EmployeesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [formData, setFormData] = useState({
-    schoolId: 'sch-ideal-101',
+    schoolId,
     employeeCode: '',
     nameEn: '',
     nameBn: '',
@@ -57,7 +59,7 @@ export default function EmployeesPage() {
     email: '',
     departmentId: '',
     designationId: '',
-    joiningDate: '2026-01-01',
+    joiningDate: new Date().toISOString().slice(0, 10),
     employmentType: 'FULL_TIME',
     status: 'ACTIVE',
   });
@@ -100,15 +102,15 @@ export default function EmployeesPage() {
   const handleOpenCreateModal = () => {
     setEditingEmployee(null);
     setFormData({
-      schoolId: 'sch-ideal-101',
-      employeeCode: `EMP-S-00${Math.floor(Math.random() * 90) + 10}`,
+      schoolId,
+      employeeCode: '',
       nameEn: '',
       nameBn: '',
       phone: '',
       email: '',
       departmentId: departments[0]?.id || '',
       designationId: designations[0]?.id || '',
-      joiningDate: '2026-01-01',
+      joiningDate: new Date().toISOString().slice(0, 10),
       employmentType: 'FULL_TIME',
       status: 'ACTIVE',
     });
@@ -119,7 +121,7 @@ export default function EmployeesPage() {
   const handleOpenEditModal = (emp: any) => {
     setEditingEmployee(emp);
     setFormData({
-      schoolId: emp.schoolId || 'sch-ideal-101',
+      schoolId: emp.schoolId || schoolId,
       employeeCode: emp.employeeCode || '',
       nameEn: emp.nameEn || '',
       nameBn: emp.nameBn || '',

@@ -82,8 +82,8 @@ export default function GuardiansPage() {
                       {g.students && g.students.length > 0 ? (
                         g.students.map((sg: any) => (
                           <div key={sg.id} className="text-xs">
-                            <span className="font-bold text-teal-700">{sg.student?.nameEn || 'Tanvir Hossain'}</span>
-                            <span className="text-[10px] text-slate-400 ml-1">({sg.student?.class?.name || 'Class 10'})</span>
+                            <span className="font-bold text-teal-700">{sg.student?.nameEn || 'Unlinked student'}</span>
+                            <span className="text-[10px] text-slate-400 ml-1">({sg.student?.class?.name || '—'})</span>
                           </div>
                         ))
                       ) : (

@@ -1,28 +1,19 @@
 import { cookies } from 'next/headers';
 import prisma from '@/src/lib/db/prisma';
 import { UserSessionData } from '@/src/lib/permissions';
+import { randomUUID } from 'crypto';
 
 const SESSION_COOKIE_NAME = 'school_session';
 const SESSION_EXPIRY_DAYS = 7;
 
 export async function createSession(userId: string, ipAddress?: string, userAgent?: string): Promise<string> {
-  const token = crypto.randomUUID();
+  const token = randomUUID();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + SESSION_EXPIRY_DAYS);
 
-  try {
-    await prisma.userSession.create({
-      data: {
-        userId,
-        token,
-        ipAddress,
-        userAgent,
-        expiresAt,
-      },
-    });
-  } catch (err) {
-    console.warn('Prisma createSession fallback:', err);
-  }
+  await prisma.userSession.create({
+    data: { userId, token, ipAddress, userAgent, expiresAt },
+  });
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE_NAME, token, {
@@ -41,15 +32,8 @@ export async function getCurrentSession(): Promise<UserSessionData | null> {
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (!token) {
-    // Return default Super Admin fallback session for initial dev/preview if cookies not set
-    return {
-      id: 'demo-super-admin-id',
-      email: process.env.SEED_ADMIN_EMAIL || 'admin@school.com',
-      name: process.env.SEED_ADMIN_NAME || 'Super Admin',
-      schoolId: 'demo-school-id',
-      roles: ['Super Admin'],
-      permissions: ['ALL', 'dashboard.view', 'users.view', 'users.manage', 'school.settings.manage', 'academic.view', 'students.view', 'teachers.view', 'attendance.view', 'exams.view', 'fees.view', 'payroll.view', 'reports.view', 'audit.view'],
-    };
+    // No session token present
+    return null;
   }
 
   try {
@@ -76,7 +60,7 @@ export async function getCurrentSession(): Promise<UserSessionData | null> {
       },
     });
 
-    if (!session || new Date() > session.expiresAt || !session.user) {
+    if (!session || new Date() > session.expiresAt || !session.user || session.user.status !== 'ACTIVE') {
       return null;
     }
 
@@ -98,15 +82,8 @@ export async function getCurrentSession(): Promise<UserSessionData | null> {
       permissions: Array.from(permissionsSet),
     };
   } catch (err) {
-    // Return default session for live preview when MySQL is not connected
-    return {
-      id: 'demo-super-admin-id',
-      email: 'admin@school.com',
-      name: 'Super Admin',
-      schoolId: 'demo-school-id',
-      roles: ['Super Admin'],
-      permissions: ['ALL', 'dashboard.view', 'users.view', 'users.manage', 'school.settings.manage', 'academic.view', 'students.view', 'teachers.view', 'attendance.view', 'exams.view', 'fees.view', 'payroll.view', 'reports.view', 'audit.view'],
-    };
+    console.error('Error retrieving session', err);
+    return null;
   }
 }
 

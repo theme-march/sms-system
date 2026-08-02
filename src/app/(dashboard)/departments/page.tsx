@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '@/src/services/staff.service';
 import { departmentSchema } from '@/src/lib/validations/staff';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export default function DepartmentsPage() {
+  const { schoolId } = useSchoolContext();
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState<any[]>([]);
   const [search, setSearch] = useState('');
@@ -32,7 +34,7 @@ export default function DepartmentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<any>(null);
   const [formData, setFormData] = useState({
-    schoolId: 'sch-ideal-101',
+    schoolId,
     nameEn: '',
     nameBn: '',
     code: '',
@@ -67,7 +69,7 @@ export default function DepartmentsPage() {
   const handleOpenCreateModal = () => {
     setEditingDept(null);
     setFormData({
-      schoolId: 'sch-ideal-101',
+      schoolId,
       nameEn: '',
       nameBn: '',
       code: '',
@@ -80,7 +82,7 @@ export default function DepartmentsPage() {
   const handleOpenEditModal = (dept: any) => {
     setEditingDept(dept);
     setFormData({
-      schoolId: dept.schoolId || 'sch-ideal-101',
+      schoolId: dept.schoolId || schoolId,
       nameEn: dept.nameEn || '',
       nameBn: dept.nameBn || '',
       code: dept.code || '',

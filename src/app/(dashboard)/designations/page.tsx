@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { getDesignations, createDesignation, updateDesignation, deleteDesignation } from '@/src/services/staff.service';
 import { designationSchema } from '@/src/lib/validations/staff';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export default function DesignationsPage() {
+  const { schoolId } = useSchoolContext();
   const [loading, setLoading] = useState(true);
   const [designations, setDesignations] = useState<any[]>([]);
   const [search, setSearch] = useState('');
@@ -32,7 +34,7 @@ export default function DesignationsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDesig, setEditingDesig] = useState<any>(null);
   const [formData, setFormData] = useState({
-    schoolId: 'sch-ideal-101',
+    schoolId,
     nameEn: '',
     nameBn: '',
     code: '',
@@ -67,7 +69,7 @@ export default function DesignationsPage() {
   const handleOpenCreateModal = () => {
     setEditingDesig(null);
     setFormData({
-      schoolId: 'sch-ideal-101',
+      schoolId,
       nameEn: '',
       nameBn: '',
       code: '',
@@ -80,7 +82,7 @@ export default function DesignationsPage() {
   const handleOpenEditModal = (desig: any) => {
     setEditingDesig(desig);
     setFormData({
-      schoolId: desig.schoolId || 'sch-ideal-101',
+      schoolId: desig.schoolId || schoolId,
       nameEn: desig.nameEn || '',
       nameBn: desig.nameBn || '',
       code: desig.code || '',

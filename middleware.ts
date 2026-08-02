@@ -4,20 +4,29 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get('school_session')?.value;
   const { pathname } = request.nextUrl;
+  const isPublic =
+    pathname === '/login' ||
+    pathname.startsWith('/admission/') ||
+    pathname.startsWith('/api/auth/');
 
-  // Protect /dashboard routes
-  if (pathname.startsWith('/dashboard') && !sessionCookie) {
-    // In production require cookie; for initial preview allow seamless navigation
-  }
-
-  // Redirect / to /dashboard
   if (pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL(sessionCookie ? '/dashboard' : '/login', request.url));
   }
 
-  return NextResponse.next();
+  if (!isPublic && !sessionCookie) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('next', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-dashboard-path', pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
 export const config = {
-  matcher: ['/', '/dashboard/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

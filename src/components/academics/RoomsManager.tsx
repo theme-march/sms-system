@@ -12,8 +12,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { roomSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function RoomsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<RoomRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function RoomsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 

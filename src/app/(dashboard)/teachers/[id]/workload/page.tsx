@@ -136,7 +136,7 @@ export default function TeacherWorkloadPage({ params }: { params: Promise<{ id: 
             <BookOpen className="w-4 h-4 text-teal-600" />
             <span>Assigned Teaching Slots ({workload?.assignments?.length || 0})</span>
           </h3>
-          <span className="text-xs text-slate-500 font-medium">Academic Year 2026-2027</span>
+          <span className="text-xs text-slate-500 font-medium">{workload?.assignments?.[0]?.academicYear?.name || 'No academic year assigned'}</span>
         </div>
 
         {!workload?.assignments || workload.assignments.length === 0 ? (

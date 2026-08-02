@@ -22,65 +22,58 @@ import {
   Clock,
   X,
   School,
+  CalendarDays,
 } from 'lucide-react';
+import { NAVIGATION_GROUPS, canAccessPermission } from '@/src/config/access-control';
 
 interface SidebarProps {
   isMobileOpen: boolean;
   onCloseMobile: () => void;
+  permissions: string[];
+  roles: string[];
+  schoolName: string;
+  schoolEiin: string;
+  currency: string;
 }
 
-const navGroups = [
-  {
-    title: 'Core Management',
-    items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { label: 'School Settings', href: '/dashboard/settings', icon: Settings },
-      { label: 'User Directory', href: '/dashboard/users', icon: UserCog },
-      { label: 'Roles & RBAC', href: '/dashboard/roles', icon: ShieldCheck },
-    ],
-  },
-  {
-    title: 'Academic & Administration',
-    items: [
-      { label: 'Academic Management', href: '/dashboard/academics', icon: School },
-      { label: 'Student Directory', href: '/dashboard/students', icon: GraduationCap },
-      { label: 'Guardians Directory', href: '/dashboard/guardians', icon: Users },
-      { label: 'Online Admissions', href: '/dashboard/admissions', icon: UserCheck },
-      { label: 'Departments', href: '/dashboard/departments', icon: Building2 },
-      { label: 'Designations', href: '/dashboard/designations', icon: ShieldCheck },
-      { label: 'Teachers Roster', href: '/dashboard/teachers', icon: Users },
-      { label: 'Employees Directory', href: '/dashboard/employees', icon: UserCog },
-      { label: 'Teacher Assignments', href: '/dashboard/teacher-assignments', icon: BookOpen },
-      { label: 'Teacher Portal', href: '/dashboard/teacher', icon: UserCheck },
-      { label: 'Student Portal', href: '/dashboard/student', icon: GraduationCap },
-      { label: 'Parent Portal', href: '/dashboard/guardian', icon: Users },
-    ],
-  },
-  {
-    title: 'Operations & Evaluation',
-    items: [
-      { label: 'Attendance Tracker', href: '/dashboard/attendance', icon: CalendarCheck2 },
-      { label: 'Class Routines', href: '/dashboard/routines', icon: Clock },
-      { label: 'Exams & Results', href: '/dashboard/exams', icon: FileSpreadsheet },
-      { label: 'Homework Assignments', href: '/dashboard/homework', icon: BookOpen },
-    ],
-  },
-  {
-    title: 'Finance & Accounts',
-    items: [
-      { label: 'Fee Structures & Invoices', href: '/dashboard/fees', icon: Receipt },
-      { label: 'Payroll Management', href: '/dashboard/payroll', icon: DollarSign },
-      { label: 'Reports & Analytics', href: '/dashboard/reports', icon: BarChart3 },
-      { label: 'System Audit Logs', href: '/dashboard/audit', icon: ClipboardList },
-    ],
-  },
-];
+const icons = {
+  Dashboard: LayoutDashboard,
+  'School Settings': Settings,
+  'User Directory': UserCog,
+  'Roles & RBAC': ShieldCheck,
+  'Academic Management': School,
+  'Student Directory': GraduationCap,
+  'Guardians Directory': Users,
+  'Online Admissions': UserCheck,
+  Departments: Building2,
+  Designations: ShieldCheck,
+  'Teachers Roster': Users,
+  'Employees Directory': UserCog,
+  'Teacher Assignments': BookOpen,
+  'Teacher Portal': UserCheck,
+  'Student Portal': GraduationCap,
+  'Parent Portal': Users,
+  'Attendance Tracker': CalendarCheck2,
+  'Class Routines': Clock,
+  'Exams & Results': FileSpreadsheet,
+  'Homework Assignments': BookOpen,
+  'Leave Management': CalendarDays,
+  'Fee Structures & Invoices': Receipt,
+  'Payroll Management': DollarSign,
+  'Reports & Analytics': BarChart3,
+  'System Audit Logs': ClipboardList,
+  'My Leave & Salary': CalendarDays,
+} as const;
 
-export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
+export function Sidebar({ isMobileOpen, onCloseMobile, permissions, roles, schoolName, schoolEiin, currency }: SidebarProps) {
   const pathname = usePathname();
+  const navGroups = NAVIGATION_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canAccessPermission(permissions, roles, item.permission)),
+  })).filter((group) => group.items.length > 0);
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200/80">
+    <div className="flex h-full min-h-0 flex-col border-r border-slate-200/80 bg-white">
       {/* Brand Header */}
       <div className="p-5 border-b border-teal-800 bg-teal-700 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 overflow-hidden">
@@ -89,7 +82,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
           </div>
           <div className="overflow-hidden">
             <h2 className="text-sm font-bold text-white truncate leading-none">
-              Ideal Academy
+              {schoolName}
             </h2>
             <p className="text-[10px] font-semibold text-teal-100 uppercase tracking-wider mt-1">
               Management Console
@@ -105,7 +98,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       </div>
 
       {/* Navigation Links */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin">
+      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-4 scrollbar-thin">
         {navGroups.map((group, idx) => (
           <div key={idx}>
             <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
@@ -116,7 +109,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                 const isActive =
                   pathname === item.href ||
                   (item.href !== '/dashboard' && pathname.startsWith(item.href));
-                const Icon = item.icon;
+                const Icon = icons[item.label as keyof typeof icons] || LayoutDashboard;
 
                 return (
                   <Link
@@ -142,13 +135,13 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             </div>
           </div>
         ))}
-      </div>
+      </nav>
 
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-100 bg-white shrink-0">
         <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-          <span>EIIN: 108234</span>
-          <span className="text-teal-600 font-bold">BDT (৳) v2.5</span>
+          <span>{schoolEiin ? `EIIN: ${schoolEiin}` : 'School Portal'}</span>
+          <span className="text-teal-600 font-bold">{currency}</span>
         </div>
       </div>
     </div>
@@ -157,7 +150,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
   return (
     <>
       {/* Desktop Sticky Sidebar */}
-      <aside className="hidden lg:block sticky top-0 h-screen w-64 shrink-0 z-30">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden h-dvh w-64 lg:block">
         {sidebarContent}
       </aside>
 

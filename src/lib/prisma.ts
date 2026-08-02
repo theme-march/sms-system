@@ -1,36 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 
+if (!process.env.DATABASE_URL) {
+  throw new Error('Missing DATABASE_URL environment variable. Set DATABASE_URL in your .env file.');
+}
+
 let prismaInstance: PrismaClient;
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-try {
-  const globalForPrisma = globalThis as unknown as {
-    prisma: PrismaClient | undefined;
-  };
-
-  prismaInstance =
-    globalForPrisma.prisma ??
-    new PrismaClient({
-      log: [],
-    });
-
-  if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.prisma = prismaInstance;
-  }
-} catch {
-  console.warn('[AI Studio] Database not connected — using mock proxy');
-  const noOp = {
-    findMany: async () => [],
-    findFirst: async () => null,
-    findUnique: async () => null,
-    count: async () => 0,
-    create: async (d: any) => d?.data ?? {},
-    update: async (d: any) => d?.data ?? {},
-    delete: async () => ({}),
-    deleteMany: async () => ({ count: 0 }),
-    createMany: async () => ({ count: 0 }),
-    updateMany: async () => ({ count: 0 }),
-  };
-  prismaInstance = new Proxy({}, { get: () => noOp }) as unknown as PrismaClient;
+if (process.env.NODE_ENV !== 'production') {
+  prismaInstance = globalForPrisma.prisma ?? new PrismaClient();
+  globalForPrisma.prisma = prismaInstance;
+} else {
+  prismaInstance = new PrismaClient();
 }
 
 export const prisma = prismaInstance;

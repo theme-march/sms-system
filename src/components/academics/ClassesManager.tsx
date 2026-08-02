@@ -12,8 +12,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { classSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function ClassesManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<ClassRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export function ClassesManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 

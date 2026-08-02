@@ -1,99 +1,38 @@
-import React from 'react';
-import { DollarSign, CheckCircle2, FileSpreadsheet } from 'lucide-react';
+'use client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Banknote, CalendarDays, CheckCircle2, FileSpreadsheet, Plus, Search, Settings2, Trash2, UserRoundCog, WalletCards, X } from 'lucide-react';
 import { PageHeader } from '@/src/components/ui/PageHeader';
-import { StatusBadge } from '@/src/components/ui/StatusBadge';
+import { DatabaseEmptyState } from '@/src/components/ui/DatabaseEmptyState';
 import { formatCurrency } from '@/src/lib/utils';
 
-export default function PayrollPage() {
-  const payrolls = [
-    {
-      id: 'pay-1',
-      teacherName: 'Dr. Shahabuddin Ahmed',
-      designation: 'Headmaster',
-      basicSalary: 65000,
-      allowances: 5000,
-      deductions: 2000,
-      netSalary: 68000,
-      month: 'July 2026',
-      status: 'APPROVED',
-    },
-    {
-      id: 'pay-2',
-      teacherName: 'Mohammad Ali Hossain',
-      designation: 'Assistant Headmaster',
-      basicSalary: 58000,
-      allowances: 4000,
-      deductions: 1500,
-      netSalary: 60500,
-      month: 'July 2026',
-      status: 'APPROVED',
-    },
-    {
-      id: 'pay-3',
-      teacherName: 'Nusrat Jahan Sultana',
-      designation: 'Senior Teacher',
-      basicSalary: 52000,
-      allowances: 3500,
-      deductions: 1000,
-      netSalary: 54500,
-      month: 'July 2026',
-      status: 'PENDING',
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Payroll & Staff Salaries"
-        subtitle="Monthly salary sheet generation, allowances, deductions, and bank transfer disbursements"
-        breadcrumbs={[{ label: 'Payroll' }]}
-        action={
-          <button className="px-3.5 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5">
-            <DollarSign className="w-3.5 h-3.5" />
-            <span>Generate July Payroll</span>
-          </button>
-        }
-      />
-
-      <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4 text-teal-600" />
-            <h3 className="text-sm font-bold text-slate-900">Salary Sheet - July 2026</h3>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-                <th className="px-4 py-3">Teacher / Employee</th>
-                <th className="px-4 py-3">Designation</th>
-                <th className="px-4 py-3">Basic Salary</th>
-                <th className="px-4 py-3">Allowances</th>
-                <th className="px-4 py-3">Deductions</th>
-                <th className="px-4 py-3 font-bold">Net Payable (BDT)</th>
-                <th className="px-4 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {payrolls.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/80">
-                  <td className="px-4 py-3 font-semibold text-slate-900">{p.teacherName}</td>
-                  <td className="px-4 py-3 text-slate-600">{p.designation}</td>
-                  <td className="px-4 py-3 font-medium text-slate-700">{formatCurrency(p.basicSalary)}</td>
-                  <td className="px-4 py-3 text-emerald-700 font-medium">+{formatCurrency(p.allowances)}</td>
-                  <td className="px-4 py-3 text-rose-600 font-medium">-{formatCurrency(p.deductions)}</td>
-                  <td className="px-4 py-3 font-bold text-slate-900">{formatCurrency(p.netSalary)}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={p.status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+const empty:any = { payrolls:[], periods:[], structures:[], assignments:[], people:[], payments:[], totals:{gross:0,net:0,paid:0,due:0} };
+const now = new Date(); const today = now.toLocaleDateString('en-CA');
+export default function PayrollPage(){
+ const [data,setData]=useState(empty),[tab,setTab]=useState('ledger'),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[modal,setModal]=useState(''),[selected,setSelected]=useState<any>(null),[message,setMessage]=useState<any>(null),[search,setSearch]=useState(''),[periodId,setPeriodId]=useState('ALL');
+ const [structure,setStructure]=useState({name:'',code:'',description:'',basic:'',houseRent:'0',medical:'0',deduction:'0'});
+ const [assignment,setAssignment]=useState({userId:'',salaryStructureId:'',effectiveDate:today});
+ const [generation,setGeneration]=useState({year:String(now.getFullYear()),month:String(now.getMonth()+1),workingDays:'26'});
+ const [payment,setPayment]=useState({amount:'',method:'BANK',reference:''});
+ const [adjustment,setAdjustment]=useState({type:'ADDITION',amount:'',reason:''});
+ const load=useCallback(async()=>{setLoading(true);try{const r=await fetch('/api/payroll',{cache:'no-store'}),p=await r.json();if(!r.ok)throw new Error(p.error);setData(p)}catch(e){setMessage({type:'error',text:e instanceof Error?e.message:'Unable to load payroll.'})}finally{setLoading(false)}},[]); useEffect(()=>{load()},[load]);
+ async function submit(body:any,success:string){setBusy(true);setMessage(null);try{const r=await fetch('/api/payroll',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),p=await r.json();if(!r.ok)throw new Error(p.error);setMessage({type:'success',text:success});setModal('');await load()}catch(e){setMessage({type:'error',text:e instanceof Error?e.message:'Operation failed.'})}finally{setBusy(false)}}
+ const rows=useMemo(()=>data.payrolls.filter((p:any)=>{const h=`${p.employee.nameEn} ${p.employee.employeeCode}`.toLowerCase();return(!search||h.includes(search.toLowerCase()))&&(periodId==='ALL'||p.payrollPeriodId===periodId)}),[data.payrolls,search,periodId]);
+ const personMap=new Map(data.people.map((p:any)=>[p.userId,p])); const structureMap=new Map(data.structures.map((s:any)=>[s.id,s]));
+ return <div className="space-y-5 pb-10"><PageHeader title="Payroll & Staff Salaries" subtitle="Salary setup, monthly processing, approval, payments and payslips" breadcrumbs={[{label:'Payroll'}]} action={data.canGenerate?<div className="flex gap-2"><button className="btn-secondary" onClick={()=>setModal('structure')}><Settings2 className="h-4 w-4"/>Salary Structure</button><button className="btn-secondary" onClick={()=>setModal('assign')}><UserRoundCog className="h-4 w-4"/>Assign Salary</button><button className="btn-primary" onClick={()=>setModal('generate')}><CalendarDays className="h-4 w-4"/>Generate Payroll</button></div>:undefined}/>
+ {message&&<div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${message.type==='success'?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-rose-200 bg-rose-50 text-rose-800'}`}>{message.text}</div>}
+ <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Gross payroll" value={data.totals.gross}/><Metric label="Net payroll" value={data.totals.net}/><Metric label="Salary paid" value={data.totals.paid}/><Metric label="Outstanding" value={data.totals.due}/></div>
+ <nav className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">{[['ledger',FileSpreadsheet,'Salary Ledger'],['periods',CalendarDays,'Payroll Periods'],['structures',Settings2,'Salary Structures'],['assignments',UserRoundCog,'Staff Assignments'],['payments',WalletCards,'Payments']] .map(([key,Icon,label]:any)=><button key={key} onClick={()=>setTab(key)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${tab===key?'bg-teal-600 text-white':'text-slate-600 hover:bg-slate-50'}`}><Icon className="h-4 w-4"/>{label}</button>)}</nav>
+ {tab==='ledger'&&<section className="card overflow-hidden"><div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:justify-between"><div><h2 className="text-sm font-bold">Monthly salary ledger</h2><p className="text-xs text-slate-500">{rows.length} payroll records</p></div><div className="flex gap-2"><label className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><input className="form-input min-w-56 pl-9" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search staff"/></label><select className="form-input w-44" value={periodId} onChange={e=>setPeriodId(e.target.value)}><option value="ALL">All periods</option>{data.periods.map((p:any)=><option key={p.id} value={p.id}>{month(p.payrollMonth)} {p.payrollYear}</option>)}</select></div></div>{loading?<Loading/>:!rows.length?<DatabaseEmptyState title="No payroll records" description="Assign salary structures, then generate a payroll period."/>:<div className="overflow-x-auto"><table className="table-base"><thead><tr><th>Staff</th><th>Period</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net salary</th><th>Paid / Due</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map((p:any)=><tr key={p.id}><td><b>{p.employee.nameEn}</b><span className="block text-[10px] text-slate-400">{p.employee.employeeCode} · {p.employee.type}</span></td><td>{p.period?`${month(p.period.payrollMonth)} ${p.period.payrollYear}`:'—'}</td><td>{formatCurrency(p.basicSalary)}</td><td className="text-emerald-700">+{formatCurrency(p.totalAllowances+p.bonus+p.overtime)}</td><td className="text-rose-700">-{formatCurrency(p.totalDeductions+p.tax+p.absenceDeduction)}</td><td className="font-bold">{formatCurrency(p.netSalary)}</td><td><span className="text-emerald-700">{formatCurrency(p.paidAmount)}</span><span className="block text-amber-700">Due {formatCurrency(Math.max(0,p.netSalary-p.paidAmount))}</span></td><td><Badge value={p.status}/></td><td>{data.canGenerate&&p.status==='DRAFT'&&<button onClick={()=>{setSelected(p);setAdjustment({type:'ADDITION',amount:'',reason:''});setModal('adjust')}} className="mr-1 rounded-lg bg-blue-50 px-2 py-2 font-bold text-blue-700">Adjust</button>}{data.canGenerate&&['APPROVED','PARTIALLY_PAID'].includes(p.status)&&<button onClick={()=>{setSelected(p);setPayment({amount:String(p.netSalary-p.paidAmount),method:'BANK',reference:''});setModal('pay')}} className="rounded-lg bg-teal-50 px-3 py-2 font-bold text-teal-700">Pay</button>}</td></tr>)}</tbody></table></div>}</section>}
+ {tab==='periods'&&<section className="card p-5"><h2 className="text-sm font-bold">Payroll periods</h2><div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.periods.map((p:any)=><article key={p.id} className="rounded-xl border p-4"><div className="flex justify-between"><div><h3 className="font-bold">{month(p.payrollMonth)} {p.payrollYear}</h3><p className="mt-1 text-xs text-slate-500">{p.workingDays} working days</p></div><Badge value={p.status}/></div><p className="mt-3 text-xs text-slate-500">{new Date(p.startDate).toLocaleDateString('en-GB')} — {new Date(p.endDate).toLocaleDateString('en-GB')}</p>{data.canApprove&&p.status==='CALCULATED'&&<button onClick={()=>submit({action:'approvePeriod',periodId:p.id},'Payroll period approved.')} className="btn-primary mt-4"><CheckCircle2 className="h-4 w-4"/>Approve Period</button>}</article>)}</div></section>}
+ {tab==='structures'&&<section className="card p-5"><div className="flex justify-between"><div><h2 className="text-sm font-bold">Salary structures</h2><p className="text-xs text-slate-500">Reusable earning and deduction packages</p></div>{data.canGenerate&&<button className="btn-primary" onClick={()=>setModal('structure')}><Plus className="h-4 w-4"/>Add Structure</button>}</div><div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.structures.map((s:any)=><article key={s.id} className="rounded-xl border p-4"><div className="flex justify-between"><div><h3 className="font-bold">{s.name}</h3><p className="text-xs text-slate-400">{s.code}</p></div><Badge value={s.isActive?'ACTIVE':'INACTIVE'}/></div><div className="mt-4 space-y-2">{s.components.map((c:any)=><div key={c.id} className="flex justify-between text-xs"><span>{c.name}</span><b className={c.type==='DEDUCTION'?'text-rose-700':'text-emerald-700'}>{c.type==='DEDUCTION'?'-':'+'}{c.amountType==='PERCENTAGE'?`${c.amount}%`:formatCurrency(c.amount)}</b></div>)}</div>{data.canGenerate&&<button onClick={()=>window.confirm(`Delete ${s.name}?`)&&submit({action:'deleteStructure',id:s.id},'Salary structure deleted.')} className="mt-4 inline-flex items-center gap-1 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"><Trash2 className="h-3.5 w-3.5"/>Delete</button>}</article>)}</div></section>}
+ {tab==='assignments'&&<section className="card overflow-hidden"><div className="flex justify-between p-5"><div><h2 className="text-sm font-bold">Staff salary assignments</h2><p className="text-xs text-slate-500">Active structure assigned per staff account</p></div>{data.canGenerate&&<button className="btn-primary" onClick={()=>setModal('assign')}><Plus className="h-4 w-4"/>Assign</button>}</div><div className="overflow-x-auto"><table className="table-base"><thead><tr><th>Staff</th><th>Type</th><th>Structure</th><th>Effective date</th><th>Status</th></tr></thead><tbody>{data.assignments.map((a:any)=><tr key={a.id}><td><b>{(personMap.get(a.userId) as any)?.nameEn||'Unlinked'}</b><span className="block text-[10px] text-slate-400">{(personMap.get(a.userId) as any)?.employeeCode}</span></td><td>{(personMap.get(a.userId) as any)?.type||'—'}</td><td>{(structureMap.get(a.salaryStructureId) as any)?.name||'Deleted structure'}</td><td>{new Date(a.effectiveDate).toLocaleDateString('en-GB')}</td><td><Badge value={a.isActive?'ACTIVE':'HISTORICAL'}/></td></tr>)}</tbody></table></div></section>}
+ {tab==='payments'&&<section className="card overflow-hidden"><div className="p-5"><h2 className="text-sm font-bold">Salary payment history</h2></div><div className="overflow-x-auto"><table className="table-base"><thead><tr><th>Date</th><th>Payroll</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead><tbody>{data.payments.map((p:any)=><tr key={p.id}><td>{new Date(p.paymentDate).toLocaleString('en-GB')}</td><td className="font-mono">{p.payrollId.slice(0,12)}</td><td><Badge value={p.paymentMethod}/></td><td>{p.transactionRef||'—'}</td><td className="font-bold text-emerald-700">{formatCurrency(p.amount)}</td></tr>)}</tbody></table></div></section>}
+ {modal==='structure'&&<Modal title="Create salary structure" close={()=>setModal('')}><form onSubmit={e=>{e.preventDefault();submit({action:'createStructure',...structure,basic:Number(structure.basic),houseRent:Number(structure.houseRent),medical:Number(structure.medical),deduction:Number(structure.deduction)},'Salary structure created.')}}><Grid><Input label="Structure name" value={structure.name} set={(v:string)=>setStructure({...structure,name:v})}/><Input label="Code" value={structure.code} set={(v:string)=>setStructure({...structure,code:v})}/><Input label="Basic salary" type="number" value={structure.basic} set={(v:string)=>setStructure({...structure,basic:v})}/><Input label="House rent allowance" type="number" value={structure.houseRent} set={(v:string)=>setStructure({...structure,houseRent:v})}/><Input label="Medical allowance" type="number" value={structure.medical} set={(v:string)=>setStructure({...structure,medical:v})}/><Input label="Standard deduction" type="number" value={structure.deduction} set={(v:string)=>setStructure({...structure,deduction:v})}/></Grid><Footer busy={busy} close={()=>setModal('')} label="Create Structure"/></form></Modal>}
+ {modal==='assign'&&<Modal title="Assign salary structure" close={()=>setModal('')}><form onSubmit={e=>{e.preventDefault();submit({action:'assignStructure',...assignment},'Salary structure assigned.')}}><Grid><Choice label="Staff member" value={assignment.userId} set={(v:string)=>setAssignment({...assignment,userId:v})} options={data.people.map((p:any)=>({value:p.userId,label:`${p.nameEn} · ${p.employeeCode} · ${p.type}`}))}/><Choice label="Salary structure" value={assignment.salaryStructureId} set={(v:string)=>setAssignment({...assignment,salaryStructureId:v})} options={data.structures.map((s:any)=>({value:s.id,label:s.name}))}/><Input label="Effective date" type="date" value={assignment.effectiveDate} set={(v:string)=>setAssignment({...assignment,effectiveDate:v})}/></Grid><Footer busy={busy} close={()=>setModal('')} label="Assign Structure"/></form></Modal>}
+ {modal==='generate'&&<Modal title="Generate monthly payroll" close={()=>setModal('')}><form onSubmit={e=>{e.preventDefault();submit({action:'generatePayroll',year:Number(generation.year),month:Number(generation.month),workingDays:Number(generation.workingDays)},'Monthly payroll generated.')}}><Grid><Input label="Year" type="number" value={generation.year} set={(v:string)=>setGeneration({...generation,year:v})}/><Choice label="Month" value={generation.month} set={(v:string)=>setGeneration({...generation,month:v})} options={Array.from({length:12},(_,i)=>({value:String(i+1),label:month(i+1)}))}/><Input label="Working days" type="number" value={generation.workingDays} set={(v:string)=>setGeneration({...generation,workingDays:v})}/></Grid><div className="mx-5 mb-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Payroll will be generated for every staff member with an active salary assignment. Approved or paid periods cannot be regenerated.</div><Footer busy={busy} close={()=>setModal('')} label="Generate Payroll"/></form></Modal>}
+ {modal==='pay'&&selected&&<Modal title={`Pay salary · ${selected.employee.nameEn}`} close={()=>setModal('')}><form onSubmit={e=>{e.preventDefault();submit({action:'recordPayment',payrollId:selected.id,...payment,amount:Number(payment.amount)},'Salary payment recorded.')}}><Grid><Input label="Amount" type="number" value={payment.amount} set={(v:string)=>setPayment({...payment,amount:v})}/><Choice label="Method" value={payment.method} set={(v:string)=>setPayment({...payment,method:v})} options={['BANK','CASH','CHEQUE','MOBILE_MONEY'].map(v=>({value:v,label:v.replace('_',' ')}))}/><Input label="Transaction reference" value={payment.reference} set={(v:string)=>setPayment({...payment,reference:v})} optional/></Grid><Footer busy={busy} close={()=>setModal('')} label="Record Payment"/></form></Modal>}
+ {modal==='adjust'&&selected&&<Modal title={`Adjust draft payroll · ${selected.employee.nameEn}`} close={()=>setModal('')}><form onSubmit={e=>{e.preventDefault();submit({action:'adjustPayroll',payrollId:selected.id,...adjustment,amount:Number(adjustment.amount)},'Payroll adjustment saved.')}}><Grid><Choice label="Adjustment type" value={adjustment.type} set={(v:string)=>setAdjustment({...adjustment,type:v})} options={[{value:'ADDITION',label:'Addition / Bonus'},{value:'DEDUCTION',label:'Deduction'}]}/><Input label="Amount" type="number" value={adjustment.amount} set={(v:string)=>setAdjustment({...adjustment,amount:v})}/><Input label="Reason" value={adjustment.reason} set={(v:string)=>setAdjustment({...adjustment,reason:v})}/></Grid><Footer busy={busy} close={()=>setModal('')} label="Save Adjustment"/></form></Modal>}
+ </div>
 }
+function month(n:number){return new Date(2026,n-1,1).toLocaleString('en',{month:'long'})} function Metric({label,value}:any){return <div className="rounded-xl border bg-white p-5 shadow-sm"><p className="text-[10px] font-bold uppercase text-slate-400">{label}</p><p className="mt-2 text-xl font-black">{formatCurrency(value)}</p></div>} function Badge({value}:any){const s=String(value);return <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${['PAID','ACTIVE','APPROVED'].includes(s)?'bg-emerald-50 text-emerald-700':s.includes('DRAFT')||s.includes('CALCULATED')?'bg-amber-50 text-amber-700':'bg-slate-100 text-slate-600'}`}>{s.replace('_',' ')}</span>} function Loading(){return <div className="space-y-2 p-5 animate-pulse"><div className="h-12 bg-slate-100"/><div className="h-12 bg-slate-50"/></div>}
+function Modal({title,close,children}:any){return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4"><div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl"><div className="flex justify-between border-b p-5"><h2 className="text-lg font-bold">{title}</h2><button onClick={close}><X className="h-5 w-5 text-slate-400"/></button></div>{children}</div></div>} function Grid({children}:any){return <div className="grid gap-4 p-5 md:grid-cols-2">{children}</div>} function Footer({busy,close,label}:any){return <div className="flex justify-end gap-2 border-t p-5"><button type="button" className="btn-secondary" onClick={close}>Cancel</button><button disabled={busy} className="btn-primary">{busy?'Saving…':label}</button></div>} function Input({label,value,set,type='text',optional=false}:any){return <label><span className="field-label">{label}</span><input required={!optional} type={type} min={type==='number'?0:undefined} step={type==='number'?'0.01':undefined} value={value} onChange={e=>set(e.target.value)} className="form-input"/></label>} function Choice({label,value,set,options}:any){return <label><span className="field-label">{label}</span><select required value={value} onChange={e=>set(e.target.value)} className="form-input"><option value="">Select {label.toLowerCase()}</option>{options.map((o:any)=><option key={o.value} value={o.value}>{o.label}</option>)}</select></label>}

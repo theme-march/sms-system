@@ -16,8 +16,10 @@ import {
 } from '@/src/services/academic-management.service';
 import { classSubjectSchema } from '@/src/lib/validations/academic';
 import { createAuditLog } from '@/src/lib/audit';
+import { useSchoolContext } from '@/src/components/layout/DashboardLayout';
 
 export function ClassSubjectsManager() {
+  const { schoolId } = useSchoolContext();
   const [data, setData] = useState<ClassSubjectRecord[]>([]);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [subjects, setSubjects] = useState<SubjectRecord[]>([]);
@@ -116,7 +118,7 @@ export function ClassSubjectsManager() {
     setFormErrors({});
 
     const payload = {
-      schoolId: 'school-1',
+      schoolId,
       ...formData,
     };
 

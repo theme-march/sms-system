@@ -6,24 +6,23 @@ import { PageHeader } from '@/src/components/ui/PageHeader';
 import { FormField } from '@/src/components/forms/FormField';
 import { SelectField } from '@/src/components/forms/SelectField';
 import { FileUploader } from '@/src/components/forms/FileUploader';
-import { getSchoolProfile, updateSchoolProfile } from '@/src/services/school.service';
 
 export default function SchoolSettingsPage() {
   const [formData, setFormData] = useState({
     id: '',
-    name: 'Dhaka Ideal Model High School & College',
-    code: 'SCH-001',
-    eiin: '108234',
-    principalName: 'Prof. Dr. Mohammad Rahman',
-    address: 'Plot 12, Road 4, Sector 7, Uttara, Dhaka-1230, Bangladesh',
-    phone: '+880 2 8951234',
-    email: 'info@dhakaideal.edu.bd',
-    website: 'https://dhakaideal.edu.bd',
+    name: '',
+    code: '',
+    eiin: '',
+    principalName: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
     currency: 'BDT',
     timezone: 'Asia/Dhaka',
     dateFormat: 'DD/MM/YYYY',
     defaultLanguage: 'bn',
-    academicYear: '2026',
+    academicYear: '',
     logoUrl: '',
     faviconUrl: '',
   });
@@ -33,7 +32,9 @@ export default function SchoolSettingsPage() {
 
   useEffect(() => {
     async function loadData() {
-      const profile = await getSchoolProfile();
+      const response = await fetch('/api/school');
+      if (!response.ok) throw new Error('Failed to load school settings');
+      const profile = await response.json();
       if (profile) {
         setFormData({
           id: profile.id,
@@ -49,7 +50,7 @@ export default function SchoolSettingsPage() {
           timezone: profile.settings?.timezone || 'Asia/Dhaka',
           dateFormat: profile.settings?.dateFormat || 'DD/MM/YYYY',
           defaultLanguage: profile.settings?.defaultLanguage || 'bn',
-          academicYear: profile.settings?.academicYear || '2026',
+          academicYear: profile.settings?.academicYear || '',
           logoUrl: profile.branding?.logoUrl || '',
           faviconUrl: profile.branding?.faviconUrl || '',
         });
@@ -68,7 +69,12 @@ export default function SchoolSettingsPage() {
     setSavedSuccess(false);
 
     try {
-      await updateSchoolProfile(formData.id, formData);
+      const response = await fetch('/api/school', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!response.ok) throw new Error('Failed to update school settings');
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
     } catch {

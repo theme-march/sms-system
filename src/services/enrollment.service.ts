@@ -81,60 +81,17 @@ export async function getEnrollments(params: EnrollmentFilterParams = {}) {
       }),
     ]);
 
-    if (enrollments.length > 0) {
-      return { total, page, pageSize, totalPages: Math.ceil(total / pageSize), data: enrollments };
-    }
+    return { total, page, pageSize, totalPages: Math.ceil(total / pageSize), data: enrollments };
   } catch (error) {
-    console.warn('Database error when fetching enrollments:', error);
+    console.error('Database error when fetching enrollments:', error);
+    return {
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 0,
+      data: [],
+    };
   }
-
-  // Fallback demo enrollments
-  const demoEnrollments = [
-    {
-      id: 'enr-001',
-      studentId: 'st-001',
-      rollNumber: 1,
-      enrollmentType: 'REGULAR',
-      enrollmentStatus: 'ACTIVE',
-      startDate: '2026-01-05T00:00:00.000Z',
-      student: {
-        id: 'st-001',
-        nameEn: 'Tanvir Hossain',
-        studentCode: 'STU-2026-1001',
-        admissionNumber: 'ADM-2026-001',
-        user: { name: 'Tanvir Hossain' },
-      },
-      academicYear: { id: 'ay-2026', name: 'Academic Year 2026' },
-      class: { id: 'cls-10', name: 'Class 10' },
-      section: { id: 'sec-10a', name: 'Padma' },
-    },
-    {
-      id: 'enr-002',
-      studentId: 'st-002',
-      rollNumber: 2,
-      enrollmentType: 'REGULAR',
-      enrollmentStatus: 'ACTIVE',
-      startDate: '2026-01-06T00:00:00.000Z',
-      student: {
-        id: 'st-002',
-        nameEn: 'Ayesha Rahman',
-        studentCode: 'STU-2026-1002',
-        admissionNumber: 'ADM-2026-002',
-        user: { name: 'Ayesha Rahman' },
-      },
-      academicYear: { id: 'ay-2026', name: 'Academic Year 2026' },
-      class: { id: 'cls-10', name: 'Class 10' },
-      section: { id: 'sec-10a', name: 'Padma' },
-    },
-  ];
-
-  return {
-    total: demoEnrollments.length,
-    page,
-    pageSize,
-    totalPages: 1,
-    data: demoEnrollments,
-  };
 }
 
 export async function createEnrollment(data: any) {
@@ -153,7 +110,7 @@ export async function createEnrollment(data: any) {
       data,
     });
   } catch (error) {
-    console.warn('Database error when creating enrollment:', error);
-    return { id: 'enr-' + Date.now(), ...data };
+    console.error('Database error when creating enrollment:', error);
+    throw error;
   }
 }

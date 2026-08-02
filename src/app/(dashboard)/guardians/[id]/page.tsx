@@ -105,18 +105,18 @@ export default function GuardianDetailPage() {
               <div key={sg.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{sg.student?.nameEn || 'Tanvir Hossain'}</h4>
+                    <h4 className="font-bold text-slate-900 text-sm">{sg.student?.nameEn || 'Unlinked student'}</h4>
                     <p className="text-[10px] text-slate-500">Student Code: {sg.student?.studentCode || 'STU-2026-1001'}</p>
                   </div>
                   <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 rounded-lg text-xs font-bold">
-                    {sg.student?.class?.name || 'Class 10'} (#{sg.student?.rollNumber || 1})
+                    {sg.student?.class?.name || '—'} (Roll {sg.student?.rollNumber ?? '—'})
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-slate-600 pt-1">
                   <span>Relationship: <strong className="text-slate-800">{sg.relationship || 'FATHER'}</strong></span>
                   <Link
-                    href={`/dashboard/students/${sg.student?.id || 'st-001'}`}
+                    href={sg.student?.id ? `/dashboard/students/${sg.student.id}` : '#'}
                     className="text-teal-700 font-bold hover:underline"
                   >
                     View Student Profile →
@@ -126,7 +126,7 @@ export default function GuardianDetailPage() {
             ))
           ) : (
             <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-500 col-span-2">
-              Tanvir Hossain (Class 10 - Padma) — Roll #1
+              No linked students found.
             </div>
           )}
         </div>

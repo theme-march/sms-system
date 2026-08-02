@@ -16,22 +16,49 @@ import { PageHeader } from '@/src/components/ui/PageHeader';
 import { StatCard } from '@/src/components/ui/StatCard';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { getStudents } from '@/src/services/student.service';
-import { getAttendanceStats } from '@/src/services/attendance.service';
-import { getFeeOverview } from '@/src/services/fee.service';
+import { getSchoolProfile } from '@/src/services/school.service';
+import { getCurrentSession } from '@/src/lib/auth/session';
+import { getDashboardAnalytics } from '@/src/services/analytics.service';
 import { formatCurrency } from '@/src/lib/utils';
+import { redirect } from 'next/navigation';
+import { canAccessPermission } from '@/src/config/access-control';
+import { PERMISSIONS } from '@/src/config/permissions';
 
 export default async function DashboardPage() {
-  const studentsRes = await getStudents({ pageSize: 5 });
-  const attendance = await getAttendanceStats();
-  const fee = await getFeeOverview();
+  const session = await getCurrentSession();
+  if (!session) redirect('/login');
+
+  const canViewManagementDashboard =
+    session.roles.includes('Super Admin') ||
+    session.permissions.includes('dashboard.view');
+
+  if (!canViewManagementDashboard) {
+    if (session.roles.includes('Teacher')) redirect('/teacher');
+    if (session.roles.includes('Student')) redirect('/student');
+    if (session.roles.includes('Parent/Guardian')) redirect('/guardian');
+    if (session.roles.includes('Employee')) redirect('/staff/leave');
+    redirect('/login');
+  }
+
+  const schoolId = session?.schoolId ?? undefined;
+  const [studentsRes, school, analytics] = await Promise.all([
+    getStudents({ pageSize: 5, schoolId }),
+    getSchoolProfile(schoolId),
+    getDashboardAnalytics(),
+  ]);
+  const feeTotal = analytics.tuitionCollected + analytics.currentMonthDues;
+  const feeClearance = feeTotal > 0 ? Math.round((analytics.tuitionCollected / feeTotal) * 100) : 0;
+  const academicYear = school?.settings?.academicYear || new Date().getFullYear().toString();
+  const upcomingExam = analytics.upcomingExams[0];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard Overview"
-        subtitle="Dhaka Ideal Model High School & College | Academic Session 2026"
+        subtitle={`${school?.name || 'School Management System'} | Academic Session ${academicYear}`}
         action={
           <div className="flex items-center gap-2">
+            {canAccessPermission(session.permissions, session.roles, PERMISSIONS.ADMISSIONS_MANAGE) && (
             <Link
               href="/dashboard/admissions"
               className="px-3.5 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
@@ -39,6 +66,8 @@ export default async function DashboardPage() {
               <UserPlus className="w-3.5 h-3.5" />
               <span>New Admission</span>
             </Link>
+            )}
+            {canAccessPermission(session.permissions, session.roles, PERMISSIONS.PAYMENTS_COLLECT) && (
             <Link
               href="/dashboard/fees"
               className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200/80 hover:bg-slate-50 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
@@ -46,6 +75,7 @@ export default async function DashboardPage() {
               <Receipt className="w-3.5 h-3.5 text-teal-600" />
               <span>Collect Fee</span>
             </Link>
+            )}
           </div>
         }
       />
@@ -54,36 +84,82 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Students"
-          value={attendance.totalStudents}
+          value={analytics.totalStudents}
           icon={GraduationCap}
           change="+12% YoY"
           trend="up"
-          description="Enrolled in Academic Session 2026"
+          description={`Enrolled in Academic Session ${academicYear}`}
         />
         <StatCard
           title="Total Teachers"
-          value={48}
+          value={analytics.totalTeachers}
           icon={Users}
-          change="Full Faculty"
+          change="Active records"
           trend="neutral"
-          description="Headmaster & Assistant Teachers"
+          description="Teaching faculty in MySQL"
         />
         <StatCard
           title="Fee Collections (BDT)"
-          value={formatCurrency(fee.collectedAmount)}
+          value={formatCurrency(analytics.tuitionCollected)}
           icon={DollarSign}
-          change="+18.4%"
-          trend="up"
+          change={`${feeClearance}% cleared`}
+          trend="neutral"
           description="Total tuition & admission fees"
         />
         <StatCard
           title="Today's Attendance"
-          value={attendance.rate}
+          value={`${analytics.attendance.rate}%`}
           icon={CalendarCheck2}
           change="High"
           trend="up"
-          description={`${attendance.presentToday} students present today`}
+          description={`${analytics.attendance.present} present · ${analytics.attendance.absent} absent`}
         />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        {[
+          ['Active Students', analytics.activeStudents],
+          ['Employees', analytics.totalEmployees],
+          ['Guardians', analytics.totalGuardians],
+          ['New Admissions', analytics.newAdmissions],
+          ['Pending Admissions', analytics.pendingAdmissionApplications],
+          ['Tuition Invoiced', formatCurrency(analytics.tuitionInvoiced)],
+          ['Current Dues', formatCurrency(analytics.currentMonthDues)],
+          ['Exam Fees', formatCurrency(analytics.examFeeCollection)],
+          ['Monthly Income', formatCurrency(analytics.monthlyIncome)],
+          ['Monthly Expense', formatCurrency(analytics.monthlyExpense)],
+          ['Monthly Payroll', formatCurrency(analytics.currentMonthPayroll)],
+          ['Unpaid Salaries', analytics.unpaidSalaries],
+          ['Pending Leave', analytics.pendingLeaveApplications],
+          ['Upcoming Exams', analytics.upcomingExams.length],
+          ['Attendance Recorded', analytics.attendance.recorded],
+        ].map(([label, value]) => (
+          <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+            <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Recent Activities</h2>
+            <p className="text-xs text-slate-500">Latest audited actions from MySQL</p>
+          </div>
+          <Link href="/dashboard/audit" className="text-xs font-semibold text-teal-600 hover:text-teal-700">View audit log</Link>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {analytics.recentActivities.length ? analytics.recentActivities.map((activity) => (
+            <div key={activity.id} className="flex items-start justify-between gap-4 py-3 text-xs">
+              <div>
+                <p className="font-semibold text-slate-800">{activity.action} · {activity.module}</p>
+                <p className="mt-0.5 line-clamp-1 text-slate-500">{activity.details || 'No additional details'}</p>
+              </div>
+              <time className="shrink-0 text-slate-400">{new Date(activity.createdAt).toLocaleString()}</time>
+            </div>
+          )) : <p className="py-6 text-center text-xs text-slate-400">No recent activity recorded.</p>}
+        </div>
       </div>
 
       {/* Main Grid Section */}
@@ -97,10 +173,12 @@ export default async function DashboardPage() {
                 Upcoming Academic Event
               </span>
               <h3 className="text-base font-bold text-white mt-2">
-                Annual Examinations 2026 & Result Publication
+                {upcomingExam?.name || 'No upcoming examination scheduled'}
               </h3>
               <p className="text-xs text-teal-100 mt-1">
-                Admit cards distribution begins November 15, 2026. Verify student fee clearances.
+                {upcomingExam
+                  ? `${upcomingExam.term} · ${upcomingExam.startDate.toLocaleDateString()}–${upcomingExam.endDate.toLocaleDateString()}`
+                  : 'Create an examination schedule from the Exams module.'}
               </p>
             </div>
             <Link
@@ -116,7 +194,7 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">Recent Student Admissions</h2>
-                <p className="text-xs text-slate-500">Newly registered students for Session 2026</p>
+                <p className="text-xs text-slate-500">Newly registered students for Session {academicYear}</p>
               </div>
               <Link
                 href="/dashboard/students"
@@ -141,14 +219,14 @@ export default async function DashboardPage() {
                 <tbody className="divide-y divide-slate-100">
                   {studentsRes.data.map((st) => (
                     <tr key={st.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-3.5 py-3 font-bold text-teal-700">{st.studentId}</td>
-                      <td className="px-3.5 py-3 font-semibold text-slate-900">{st.user.name}</td>
+                      <td className="px-3.5 py-3 font-bold text-teal-700">{st.admissionNumber || st.studentCode || '-'}</td>
+                      <td className="px-3.5 py-3 font-semibold text-slate-900">{st.user?.name || st.nameEn || '-'}</td>
                       <td className="px-3.5 py-3 text-slate-600">
-                        {st.class.name} - {st.section.name}
+                        {st.class?.name || '-'} {st.section ? `- ${st.section.name}` : ''}
                       </td>
-                      <td className="px-3.5 py-3 font-semibold text-slate-800">#{st.rollNumber}</td>
+                      <td className="px-3.5 py-3 font-semibold text-slate-800">#{st.rollNumber || '-'}</td>
                       <td className="px-3.5 py-3">
-                        <StatusBadge status={st.user.status || 'ACTIVE'} />
+                        <StatusBadge status={st.user?.status || st.status || 'ACTIVE'} />
                       </td>
                     </tr>
                   ))}
@@ -169,30 +247,30 @@ export default async function DashboardPage() {
               <div>
                 <div className="flex justify-between font-semibold text-slate-700 mb-1">
                   <span>Student Attendance Rate</span>
-                  <span className="text-teal-600 font-bold">{attendance.rate}</span>
+                  <span className="text-teal-600 font-bold">{analytics.attendance.rate}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="bg-teal-500 h-full w-[94%]" />
+                  <div className="bg-teal-500 h-full" style={{ width: `${analytics.attendance.rate}%` }} />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between font-semibold text-slate-700 mb-1">
                   <span>Fee Collection Clearance</span>
-                  <span className="text-indigo-600 font-bold">78%</span>
+                  <span className="text-indigo-600 font-bold">{feeClearance}%</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="bg-indigo-500 h-full w-[78%]" />
+                  <div className="bg-indigo-500 h-full" style={{ width: `${feeClearance}%` }} />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between font-semibold text-slate-700 mb-1">
                   <span>Faculty Presence</span>
-                  <span className="text-emerald-600 font-bold">100%</span>
+                  <span className="text-emerald-600 font-bold">{analytics.totalTeachers}</span>
                 </div>
                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full w-[100%]" />
+                  <div className="bg-emerald-500 h-full" style={{ width: analytics.totalTeachers ? '100%' : '0%' }} />
                 </div>
               </div>
             </div>

@@ -1,603 +1,159 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-  Clock,
-  Calendar,
-  BookOpen,
-  Plus,
-  Printer,
-  History,
-  AlertTriangle,
-  CheckCircle2,
-  X,
-  Filter,
-  UserCheck,
-  Building,
-  Layers,
-  FileText,
-} from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Clock, Edit2, Plus, Printer, Save, Trash2, X } from 'lucide-react';
 import { PageHeader } from '@/src/components/ui/PageHeader';
+import { DatabaseEmptyState } from '@/src/components/ui/DatabaseEmptyState';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
-import {
-  getClassRoutines,
-  createClassRoutine,
-  updateClassRoutine,
-  deleteClassRoutine,
-  getRoutineVersions,
-  createRoutineVersion,
-  ClassRoutineRecord,
-  RoutineVersionRecord,
-} from '@/src/services/routine.service';
-import { WEEKDAYS, Weekday } from '@/src/lib/validations/routine';
+import { ConfirmDialog } from '@/src/components/ui/ConfirmDialog';
 
-export default function ClassRoutinesPage() {
+const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as const;
+type Routine = { id: string; academicYearId: string; sessionId: string | null; classId: string; sectionId: string; groupId: string | null; subjectId: string; teacherId: string; roomId: string | null; weekday: typeof WEEKDAYS[number]; periodId: string; startTime: string; endTime: string; effectiveFrom: string; effectiveTo: string; status: 'DRAFT' | 'PUBLISHED' | 'INACTIVE'; versionNumber: number; className: string; sectionName: string; groupName: string; subjectName: string; subjectCode: string; teacherName: string; teacherCode: string; roomName: string; periodName: string };
+type OptionData = {
+  academicYears: Array<{ id: string; name: string; isCurrent: boolean }>;
+  sessions: Array<{ id: string; name: string; academicYearId: string }>;
+  classes: Array<{ id: string; name: string; sections: Array<{ id: string; name: string }> }>;
+  classGroups: Array<{ academicYearId: string; classId: string; groupId: string; groupName: string }>;
+  classSubjects: Array<{ academicYearId: string | null; classId: string; groupId: string | null; subjectId: string; subjectName: string; subjectCode: string }>;
+  teachers: Array<{ id: string; nameEn: string; employeeCode: string }>;
+  rooms: Array<{ id: string; name: string; code: string }>;
+  periods: Array<{ id: string; name: string; startTime: string; endTime: string }>;
+};
+type FormState = { academicYearId: string; sessionId: string; classId: string; sectionId: string; groupId: string; subjectId: string; teacherId: string; roomId: string; weekday: typeof WEEKDAYS[number]; periodId: string; startTime: string; endTime: string; effectiveFrom: string; effectiveTo: string; status: Routine['status'] };
+const emptyOptions: OptionData = { academicYears: [], sessions: [], classes: [], classGroups: [], classSubjects: [], teachers: [], rooms: [], periods: [] };
+const blankForm: FormState = { academicYearId: '', sessionId: '', classId: '', sectionId: '', groupId: '', subjectId: '', teacherId: '', roomId: '', weekday: 'SUNDAY', periodId: '', startTime: '', endTime: '', effectiveFrom: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' }), effectiveTo: '', status: 'PUBLISHED' };
+
+export default function RoutinesPage() {
+  const [data, setData] = useState<Routine[]>([]);
+  const [options, setOptions] = useState<OptionData>(emptyOptions);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [routines, setRoutines] = useState<ClassRoutineRecord[]>([]);
-  const [viewMode, setViewMode] = useState<'CLASS' | 'TEACHER' | 'ROOM'>('CLASS');
+  const [saving, setSaving] = useState(false);
+  const [classFilter, setClassFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [teacherFilter, setTeacherFilter] = useState('');
+  const [weekdayFilter, setWeekdayFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Routine | null>(null);
+  const [deleting, setDeleting] = useState<Routine | null>(null);
+  const [form, setForm] = useState<FormState>(blankForm);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Filters
-  const [selectedClass, setSelectedClass] = useState('c-6');
-  const [selectedSection, setSelectedSection] = useState('s-padma');
-  const [selectedTeacher, setSelectedTeacher] = useState('t-1');
-  const [selectedRoom, setSelectedRoom] = useState('r-101');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Modals & Drawers
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showVersionDrawer, setShowVersionDrawer] = useState(false);
-  const [versions, setVersions] = useState<RoutineVersionRecord[]>([]);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-
-  // Form State
-  const [formPayload, setFormPayload] = useState({
-    schoolId: 'school-1',
-    academicYearId: 'ay-2026',
-    classId: 'c-6',
-    sectionId: 's-padma',
-    subjectId: 'sub-1',
-    teacherId: 't-1',
-    roomId: 'r-101',
-    weekday: 'SUNDAY' as Weekday,
-    periodId: 'p-1',
-    startTime: '08:30',
-    endTime: '09:15',
-    effectiveFrom: new Date().toISOString().split('T')[0],
-    status: 'PUBLISHED' as const,
-  });
-
-  const periodsList = [
-    { id: 'p-1', name: '1st Period', startTime: '08:30', endTime: '09:15', isBreak: false, isAssembly: false },
-    { id: 'p-2', name: '2nd Period', startTime: '09:15', endTime: '10:00', isBreak: false, isAssembly: false },
-    { id: 'p-3', name: '3rd Period', startTime: '10:00', endTime: '10:45', isBreak: false, isAssembly: false },
-    { id: 'p-brk', name: 'Tiffin Break', startTime: '10:45', endTime: '11:15', isBreak: true, isAssembly: false },
-    { id: 'p-4', name: '4th Period', startTime: '11:15', endTime: '12:00', isBreak: false, isAssembly: false },
-    { id: 'p-5', name: '5th Period', startTime: '12:00', endTime: '12:45', isBreak: false, isAssembly: false },
-    { id: 'p-6', name: '6th Period', startTime: '12:45', endTime: '01:30', isBreak: false, isAssembly: false },
-  ];
-
-  const fetchRoutinesData = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getClassRoutines({
-        classId: viewMode === 'CLASS' ? selectedClass : undefined,
-        sectionId: viewMode === 'CLASS' ? selectedSection : undefined,
-        teacherId: viewMode === 'TEACHER' ? selectedTeacher : undefined,
-        roomId: viewMode === 'ROOM' ? selectedRoom : undefined,
-        search: searchQuery,
-      });
-      setRoutines(data);
+      const query = new URLSearchParams();
+      if (classFilter) query.set('classId', classFilter);
+      if (sectionFilter) query.set('sectionId', sectionFilter);
+      if (teacherFilter) query.set('teacherId', teacherFilter);
+      if (weekdayFilter) query.set('weekday', weekdayFilter);
+      if (statusFilter) query.set('status', statusFilter);
+      const response = await fetch(`/api/routines?${query}`, { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Unable to load class routines.');
+      setData(payload.data.sort((a: Routine, b: Routine) => WEEKDAYS.indexOf(a.weekday) - WEEKDAYS.indexOf(b.weekday) || a.startTime.localeCompare(b.startTime)));
+      setOptions({ academicYears: payload.academicYears, sessions: payload.sessions, classes: payload.classes, classGroups: payload.classGroups, classSubjects: payload.classSubjects, teachers: payload.teachers, rooms: payload.rooms, periods: payload.periods });
+      setCanManage(payload.canManage);
+    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load routines.' }); }
+    finally { setLoading(false); }
+  }, [classFilter, sectionFilter, statusFilter, teacherFilter, weekdayFilter]);
 
-      const verData = await getRoutineVersions(selectedClass, selectedSection);
-      setVersions(verData);
-    } catch {
-      // Handled
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    fetchRoutinesData();
-  }, [viewMode, selectedClass, selectedSection, selectedTeacher, selectedRoom, searchQuery]);
+  const filterClass = options.classes.find((item) => item.id === classFilter);
+  const formClass = options.classes.find((item) => item.id === form.classId);
+  const formSessions = options.sessions.filter((item) => item.academicYearId === form.academicYearId);
+  const formGroups = options.classGroups.filter((item) => item.academicYearId === form.academicYearId && item.classId === form.classId);
+  const formSubjects = useMemo(() => {
+    const seen = new Set<string>();
+    return options.classSubjects.filter((item) => item.classId === form.classId && (!item.academicYearId || item.academicYearId === form.academicYearId) && (!item.groupId || item.groupId === form.groupId)).filter((item) => !seen.has(item.subjectId) && Boolean(seen.add(item.subjectId)));
+  }, [form.academicYearId, form.classId, form.groupId, options.classSubjects]);
 
-  const handleCreateRoutine = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-    setSuccessMessage('');
+  function openCreate() {
+    const year = options.academicYears.find((item) => item.isCurrent) || options.academicYears[0];
+    const cls = options.classes[0];
+    const section = cls?.sections[0];
+    const session = options.sessions.find((item) => item.academicYearId === year?.id);
+    const subject = options.classSubjects.find((item) => item.classId === cls?.id && (!item.academicYearId || item.academicYearId === year?.id));
+    const period = options.periods[0];
+    setEditing(null);
+    setForm({ ...blankForm, academicYearId: year?.id || '', sessionId: session?.id || '', classId: cls?.id || '', sectionId: section?.id || '', subjectId: subject?.subjectId || '', teacherId: options.teachers[0]?.id || '', roomId: options.rooms[0]?.id || '', periodId: period?.id || '', startTime: period?.startTime || '', endTime: period?.endTime || '' });
+    setMessage(null); setModalOpen(true);
+  }
 
+  function openEdit(item: Routine) {
+    setEditing(item);
+    setForm({ academicYearId: item.academicYearId, sessionId: item.sessionId || '', classId: item.classId, sectionId: item.sectionId, groupId: item.groupId || '', subjectId: item.subjectId, teacherId: item.teacherId, roomId: item.roomId || '', weekday: item.weekday, periodId: item.periodId, startTime: item.startTime, endTime: item.endTime, effectiveFrom: item.effectiveFrom, effectiveTo: item.effectiveTo, status: item.status });
+    setMessage(null); setModalOpen(true);
+  }
+
+  function changeYear(value: string) { setForm((current) => ({ ...current, academicYearId: value, sessionId: options.sessions.find((item) => item.academicYearId === value)?.id || '', groupId: '', subjectId: '' })); }
+  function changeClass(value: string) { const cls = options.classes.find((item) => item.id === value); setForm((current) => ({ ...current, classId: value, sectionId: cls?.sections[0]?.id || '', groupId: '', subjectId: options.classSubjects.find((item) => item.classId === value && (!item.academicYearId || item.academicYearId === current.academicYearId))?.subjectId || '' })); }
+  function changeGroup(value: string) { setForm((current) => ({ ...current, groupId: value, subjectId: '' })); }
+  function changePeriod(value: string) { const period = options.periods.find((item) => item.id === value); setForm((current) => ({ ...current, periodId: value, startTime: period?.startTime || '', endTime: period?.endTime || '' })); }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setSaving(true); setMessage(null);
     try {
-      await createClassRoutine(formPayload);
-      setSuccessMessage('Class routine slot added successfully!');
-      setShowAddModal(false);
-      fetchRoutinesData();
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to create routine slot due to validation conflict.');
-    }
-  };
+      const response = await fetch(`/api/routines${editing ? `?id=${editing.id}` : ''}`, { method: editing ? 'PUT' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(form) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Unable to save routine slot.');
+      setModalOpen(false); setMessage({ type: 'success', text: editing ? 'Routine slot updated successfully.' : 'Routine slot created successfully.' }); await load();
+    } catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to save routine.' }); }
+    finally { setSaving(false); }
+  }
 
-  const handleCreateSnapshotVersion = async () => {
-    try {
-      await createRoutineVersion(
-        selectedClass,
-        selectedSection,
-        `Snapshot created on ${new Date().toLocaleDateString()}`,
-        'admin@school.com'
-      );
-      setSuccessMessage('Routine version snapshot saved successfully.');
-      const verData = await getRoutineVersions(selectedClass, selectedSection);
-      setVersions(verData);
-    } catch {
-      // Handled
-    }
-  };
+  async function remove() {
+    if (!deleting) return;
+    try { const response = await fetch(`/api/routines?id=${deleting.id}`, { method: 'DELETE' }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'Unable to delete routine.'); setMessage({ type: 'success', text: 'Routine slot deleted.' }); setDeleting(null); await load(); }
+    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to delete routine.' }); }
+  }
 
-  const handlePrint = () => {
-    window.print();
-  };
+  return <div className="space-y-6">
+    <div className="print:hidden"><PageHeader title="Class Routine Management" subtitle="Build weekly timetables with teacher, room, class and period conflict protection" breadcrumbs={[{ label: 'Routines' }]} action={<div className="flex gap-2"><button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"><Printer className="h-4 w-4" />Print</button>{canManage && <button onClick={openCreate} className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-xs font-bold text-white hover:bg-teal-700"><Plus className="h-4 w-4" />Add Routine Slot</button>}</div>} /></div>
+    <div className="hidden text-center print:block"><h1 className="text-xl font-bold">Official Weekly Class Timetable</h1><p className="text-sm">Generated from MySQL</p></div>
+    {message && <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{message.text}</div>}
 
-  return (
-    <div className="space-y-6">
-      <div className="print:hidden">
-        <PageHeader
-          title="Class Routine Management"
-          subtitle="Timetable scheduling, conflict detection, and version history"
-          breadcrumbs={[{ label: 'Academics' }, { label: 'Class Routines' }]}
-          action={
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePrint}
-                className="px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors flex items-center gap-1.5"
-              >
-                <Printer className="w-4 h-4 text-slate-600" />
-                <span>Print Timetable</span>
-              </button>
-              <button
-                onClick={() => setShowVersionDrawer(true)}
-                className="px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors flex items-center gap-1.5"
-              >
-                <History className="w-4 h-4 text-teal-600" />
-                <span>Versions ({versions.length})</span>
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-3.5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-xs transition-colors flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Routine Slot</span>
-              </button>
-            </div>
-          }
-        />
-      </div>
-
-      {/* Printable Title Block for Print Mode */}
-      <div className="hidden print:block text-center border-b pb-4 mb-4">
-        <h1 className="text-xl font-black text-slate-900">DHAKA IDEAL HIGH SCHOOL</h1>
-        <h2 className="text-sm font-bold text-slate-700">Official Weekly Class Timetable (Academic Year 2026)</h2>
-        <p className="text-xs text-slate-500">
-          View Mode: {viewMode} • Class 6 (Padma Section) • Effective Date: Jan 2026
-        </p>
-      </div>
-
-      {/* Error & Success Messages */}
-      {errorMessage && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-          <button onClick={() => setErrorMessage('')}>
-            <X className="w-4 h-4 text-rose-600" />
-          </button>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-900 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-          <button onClick={() => setSuccessMessage('')}>
-            <X className="w-4 h-4 text-emerald-600" />
-          </button>
-        </div>
-      )}
-
-      {/* Controls Header */}
-      <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs space-y-4 print:hidden">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* View Mode Switcher */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-lg text-xs font-bold">
-            <button
-              onClick={() => setViewMode('CLASS')}
-              className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-                viewMode === 'CLASS' ? 'bg-white text-teal-800 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Class View</span>
-            </button>
-            <button
-              onClick={() => setViewMode('TEACHER')}
-              className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-                viewMode === 'TEACHER' ? 'bg-white text-teal-800 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>Teacher View</span>
-            </button>
-            <button
-              onClick={() => setViewMode('ROOM')}
-              className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
-                viewMode === 'ROOM' ? 'bg-white text-teal-800 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Building className="w-3.5 h-3.5" />
-              <span>Room View</span>
-            </button>
-          </div>
-
-          {/* Dynamic Dropdown Selectors */}
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            {viewMode === 'CLASS' && (
-              <>
-                <select
-                  value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:outline-hidden"
-                >
-                  <option value="c-6">Class 6</option>
-                  <option value="c-7">Class 7</option>
-                  <option value="c-8">Class 8</option>
-                  <option value="c-9">Class 9</option>
-                  <option value="c-10">Class 10</option>
-                </select>
-
-                <select
-                  value={selectedSection}
-                  onChange={(e) => setSelectedSection(e.target.value)}
-                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:outline-hidden"
-                >
-                  <option value="s-padma">Padma Section</option>
-                  <option value="s-meghna">Meghna Section</option>
-                  <option value="s-jamuna">Jamuna Section</option>
-                </select>
-              </>
-            )}
-
-            {viewMode === 'TEACHER' && (
-              <select
-                value={selectedTeacher}
-                onChange={(e) => setSelectedTeacher(e.target.value)}
-                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:outline-hidden"
-              >
-                <option value="t-1">Dr. Rafiqul Islam (Bangla)</option>
-                <option value="t-2">Nusrat Jahan (English)</option>
-                <option value="t-3">Mahmudul Hasan (Mathematics)</option>
-              </select>
-            )}
-
-            {viewMode === 'ROOM' && (
-              <select
-                value={selectedRoom}
-                onChange={(e) => setSelectedRoom(e.target.value)}
-                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:outline-hidden"
-              >
-                <option value="r-101">Classroom 101</option>
-                <option value="r-102">Classroom 102</option>
-                <option value="r-201">Science Laboratory</option>
-                <option value="r-301">Computer Lab (ICT)</option>
-              </select>
-            )}
-
-            <button
-              onClick={handleCreateSnapshotVersion}
-              className="px-3 py-1.5 bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200 font-bold rounded-lg transition-colors"
-            >
-              Save Version Snapshot
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Timetable Grid Matrix */}
-      <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider">
-                <th className="px-3 py-3 border-r border-slate-200 text-center w-32">Period & Time</th>
-                {WEEKDAYS.map((day) => {
-                  const isWeekend = day === 'FRIDAY' || day === 'SATURDAY';
-                  return (
-                    <th
-                      key={day}
-                      className={`px-3 py-3 text-center border-r border-slate-200 ${
-                        isWeekend ? 'bg-amber-50/70 text-amber-900' : ''
-                      }`}
-                    >
-                      {day}
-                      {isWeekend && (
-                        <span className="block text-[9px] font-normal text-amber-700 uppercase">
-                          Weekly Holiday
-                        </span>
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {periodsList.map((period) => (
-                <tr key={period.id} className={period.isBreak ? 'bg-slate-50/80 font-bold' : 'hover:bg-slate-50/50'}>
-                  {/* Period Name & Time */}
-                  <td className="px-3 py-3 font-bold text-teal-800 border-r border-slate-200 whitespace-nowrap text-center bg-slate-50/40">
-                    <div>{period.name}</div>
-                    <div className="text-[10px] text-slate-500 font-normal">
-                      {period.startTime} - {period.endTime}
-                    </div>
-                  </td>
-
-                  {/* Weekday Cells */}
-                  {WEEKDAYS.map((day) => {
-                    const isWeekend = day === 'FRIDAY' || day === 'SATURDAY';
-
-                    if (period.isBreak) {
-                      return (
-                        <td key={day} className="px-2 py-3 text-center text-slate-400 border-r border-slate-200 italic font-semibold bg-amber-50/30">
-                          --- BREAK ---
-                        </td>
-                      );
-                    }
-
-                    if (isWeekend) {
-                      return (
-                        <td key={day} className="px-2 py-3 text-center text-amber-600/70 border-r border-slate-200 font-medium bg-amber-50/20 italic">
-                          Holiday
-                        </td>
-                      );
-                    }
-
-                    // Find matching routine slot
-                    const matchSlot = routines.find(
-                      (r) => r.weekday === day && r.periodId === period.id
-                    );
-
-                    return (
-                      <td
-                        key={day}
-                        className="px-2 py-2.5 text-center border-r border-slate-200 align-top min-w-[130px]"
-                      >
-                        {matchSlot ? (
-                          <div className="p-2 bg-teal-50/70 border border-teal-200/80 rounded-lg text-left space-y-1 shadow-2xs hover:border-teal-400 transition-colors">
-                            <p className="font-extrabold text-slate-900 text-[11px] leading-tight">
-                              {matchSlot.subjectName || 'Subject'}
-                            </p>
-                            <p className="text-[10px] font-semibold text-teal-800">
-                              {matchSlot.teacherName || 'Teacher'}
-                            </p>
-                            <div className="flex items-center justify-between text-[9px] text-slate-500 border-t border-teal-100 pt-1">
-                              <span>{matchSlot.roomName || 'Room 101'}</span>
-                              <span className="font-mono font-bold text-slate-600">{matchSlot.startTime}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="h-full min-h-[50px] flex items-center justify-center text-slate-300 hover:text-slate-400 text-[10px]">
-                            <span className="opacity-0 hover:opacity-100 font-bold text-teal-600 cursor-pointer">+ Add</span>
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Add Class Routine Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-teal-600" />
-                <span>Add New Class Routine Slot</span>
-              </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateRoutine} className="p-5 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Class</label>
-                  <select
-                    value={formPayload.classId}
-                    onChange={(e) => setFormPayload({ ...formPayload, classId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  >
-                    <option value="c-6">Class 6</option>
-                    <option value="c-7">Class 7</option>
-                    <option value="c-8">Class 8</option>
-                    <option value="c-9">Class 9</option>
-                    <option value="c-10">Class 10</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Section</label>
-                  <select
-                    value={formPayload.sectionId}
-                    onChange={(e) => setFormPayload({ ...formPayload, sectionId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  >
-                    <option value="s-padma">Padma Section</option>
-                    <option value="s-meghna">Meghna Section</option>
-                    <option value="s-jamuna">Jamuna Section</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Subject</label>
-                  <select
-                    value={formPayload.subjectId}
-                    onChange={(e) => setFormPayload({ ...formPayload, subjectId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  >
-                    <option value="sub-1">Bangla 1st Paper</option>
-                    <option value="sub-2">English 1st Paper</option>
-                    <option value="sub-3">General Mathematics</option>
-                    <option value="sub-5">Physics</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Teacher</label>
-                  <select
-                    value={formPayload.teacherId}
-                    onChange={(e) => setFormPayload({ ...formPayload, teacherId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  >
-                    <option value="t-1">Dr. Rafiqul Islam</option>
-                    <option value="t-2">Nusrat Jahan</option>
-                    <option value="t-3">Mahmudul Hasan</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Weekday</label>
-                  <select
-                    value={formPayload.weekday}
-                    onChange={(e) => setFormPayload({ ...formPayload, weekday: e.target.value as Weekday })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  >
-                    {WEEKDAYS.map((w) => (
-                      <option key={w} value={w}>
-                        {w}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Period</label>
-                  <select
-                    value={formPayload.periodId}
-                    onChange={(e) => setFormPayload({ ...formPayload, periodId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  >
-                    {periodsList
-                      .filter((p) => !p.isBreak)
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Room</label>
-                  <select
-                    value={formPayload.roomId || ''}
-                    onChange={(e) => setFormPayload({ ...formPayload, roomId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  >
-                    <option value="r-101">Classroom 101</option>
-                    <option value="r-102">Classroom 102</option>
-                    <option value="r-201">Science Lab</option>
-                    <option value="r-301">ICT Lab</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Start Time (HH:MM)</label>
-                  <input
-                    type="text"
-                    value={formPayload.startTime}
-                    onChange={(e) => setFormPayload({ ...formPayload, startTime: e.target.value })}
-                    placeholder="08:30"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">End Time (HH:MM)</label>
-                  <input
-                    type="text"
-                    value={formPayload.endTime}
-                    onChange={(e) => setFormPayload({ ...formPayload, endTime: e.target.value })}
-                    placeholder="09:15"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-xs transition-colors"
-                >
-                  Validate & Save Slot
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Routine Versions Drawer */}
-      {showVersionDrawer && (
-        <div className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-xs flex justify-end">
-          <div className="bg-white w-full max-w-md h-full shadow-2xl p-6 overflow-y-auto space-y-4">
-            <div className="flex items-center justify-between border-b pb-4">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <History className="w-4 h-4 text-teal-600" />
-                <span>Routine Version Snapshots</span>
-              </h3>
-              <button onClick={() => setShowVersionDrawer(false)}>
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            {versions.length === 0 ? (
-              <p className="text-xs text-slate-400 italic">No saved version history found.</p>
-            ) : (
-              <div className="space-y-3 text-xs">
-                {versions.map((ver) => (
-                  <div key={ver.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-teal-800">Version #{ver.versionNumber}</span>
-                      <span className="text-[10px] text-slate-400">{new Date(ver.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <p className="text-slate-600 font-medium">{ver.changeSummary || 'Routine Update Snapshot'}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">Created By: {ver.createdBy}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+    <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:hidden md:grid-cols-2 xl:grid-cols-5">
+      <Select label="Class" value={classFilter} onChange={(value) => { setClassFilter(value); setSectionFilter(''); }} placeholder="All classes" options={options.classes.map((item) => ({ value: item.id, label: item.name }))} />
+      <Select label="Section" value={sectionFilter} onChange={setSectionFilter} placeholder="All sections" options={(filterClass?.sections || []).map((item) => ({ value: item.id, label: item.name }))} />
+      <Select label="Teacher" value={teacherFilter} onChange={setTeacherFilter} placeholder="All teachers" options={options.teachers.map((item) => ({ value: item.id, label: `${item.nameEn} (${item.employeeCode})` }))} />
+      <Select label="Day" value={weekdayFilter} onChange={setWeekdayFilter} placeholder="All days" options={WEEKDAYS.map((item) => ({ value: item, label: item }))} />
+      <Select label="Status" value={statusFilter} onChange={setStatusFilter} placeholder="All statuses" options={['PUBLISHED', 'DRAFT', 'INACTIVE'].map((item) => ({ value: item, label: item }))} />
     </div>
-  );
+
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 className="flex items-center gap-2 text-sm font-bold"><Clock className="h-4 w-4 text-teal-600" />Weekly timetable</h2><span className="text-xs text-slate-500">{data.length} slots</span></div>
+      {loading ? <div className="space-y-3 p-6 animate-pulse"><div className="h-10 rounded bg-slate-100" /><div className="h-14 rounded bg-slate-50" /></div> : !data.length ? <DatabaseEmptyState title="No class routine" description="Use Add Routine Slot to build the weekly timetable." /> : <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3">Day / Period</th><th className="p-3">Time</th><th className="p-3">Class</th><th className="p-3">Group</th><th className="p-3">Subject</th><th className="p-3">Teacher</th><th className="p-3">Room</th><th className="p-3">Status</th><th className="p-3 print:hidden">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{data.map((item) => <tr key={item.id} className="hover:bg-slate-50"><td className="p-3"><p className="font-bold">{item.weekday}</p><p className="text-[10px] text-slate-400">{item.periodName}</p></td><td className="p-3 font-mono">{item.startTime}–{item.endTime}</td><td className="p-3"><p className="font-bold">{item.className}</p><p className="text-[10px] text-slate-400">{item.sectionName}</p></td><td className="p-3">{item.groupName || 'All'}</td><td className="p-3"><p className="font-semibold">{item.subjectName}</p><p className="text-[10px] text-slate-400">{item.subjectCode}</p></td><td className="p-3"><p>{item.teacherName}</p><p className="text-[10px] text-slate-400">{item.teacherCode}</p></td><td className="p-3">{item.roomName}</td><td className="p-3"><StatusBadge status={item.status} /></td><td className="p-3 print:hidden">{canManage && <div className="flex gap-1"><button onClick={() => openEdit(item)} title="Edit" className="rounded-md p-2 text-blue-600 hover:bg-blue-50"><Edit2 className="h-4 w-4" /></button><button onClick={() => setDeleting(item)} title="Delete" className="rounded-md p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></button></div>}</td></tr>)}</tbody></table></div>}
+    </section>
+
+    {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-xs print:hidden"><form onSubmit={submit} className="my-auto w-full max-w-4xl rounded-xl border border-slate-200 bg-white shadow-xl"><div className="flex items-start justify-between border-b border-slate-200 p-5"><div><h2 className="text-lg font-bold">{editing ? 'Edit Routine Slot' : 'Add Routine Slot'}</h2><p className="mt-1 text-xs text-slate-500">Conflicting teacher, room, class-section and period assignments are blocked automatically.</p></div><button type="button" onClick={() => setModalOpen(false)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
+      <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+        <Select label="Academic year" required value={form.academicYearId} onChange={changeYear} options={options.academicYears.map((item) => ({ value: item.id, label: `${item.name}${item.isCurrent ? ' (Current)' : ''}` }))} />
+        <Select label="Session" value={form.sessionId} onChange={(value) => setForm({ ...form, sessionId: value })} placeholder="No session" options={formSessions.map((item) => ({ value: item.id, label: item.name }))} />
+        <Select label="Class" required value={form.classId} onChange={changeClass} options={options.classes.map((item) => ({ value: item.id, label: item.name }))} />
+        <Select label="Section" required value={form.sectionId} onChange={(value) => setForm({ ...form, sectionId: value })} options={(formClass?.sections || []).map((item) => ({ value: item.id, label: item.name }))} />
+        <Select label="Group" value={form.groupId} onChange={changeGroup} placeholder="All groups" options={formGroups.map((item) => ({ value: item.groupId, label: item.groupName }))} />
+        <Select label="Subject" required value={form.subjectId} onChange={(value) => setForm({ ...form, subjectId: value })} options={formSubjects.map((item) => ({ value: item.subjectId, label: `${item.subjectName} (${item.subjectCode})` }))} />
+        <Select label="Teacher" required value={form.teacherId} onChange={(value) => setForm({ ...form, teacherId: value })} options={options.teachers.map((item) => ({ value: item.id, label: `${item.nameEn} (${item.employeeCode})` }))} />
+        <Select label="Room" value={form.roomId} onChange={(value) => setForm({ ...form, roomId: value })} placeholder="No fixed room" options={options.rooms.map((item) => ({ value: item.id, label: `${item.name} (${item.code})` }))} />
+        <Select label="Day" required value={form.weekday} onChange={(value) => setForm({ ...form, weekday: value as FormState['weekday'] })} options={WEEKDAYS.map((item) => ({ value: item, label: item }))} />
+        <Select label="Period" required value={form.periodId} onChange={changePeriod} options={options.periods.map((item) => ({ value: item.id, label: `${item.name} (${item.startTime}–${item.endTime})` }))} />
+        <Input label="Start time" required type="time" value={form.startTime} onChange={(value) => setForm({ ...form, startTime: value })} />
+        <Input label="End time" required type="time" value={form.endTime} onChange={(value) => setForm({ ...form, endTime: value })} />
+        <Input label="Effective from" required type="date" value={form.effectiveFrom} onChange={(value) => setForm({ ...form, effectiveFrom: value })} />
+        <Input label="Effective to" type="date" value={form.effectiveTo} onChange={(value) => setForm({ ...form, effectiveTo: value })} />
+        <Select label="Status" required value={form.status} onChange={(value) => setForm({ ...form, status: value as Routine['status'] })} options={['PUBLISHED', 'DRAFT', 'INACTIVE'].map((item) => ({ value: item, label: item }))} />
+      </div>
+      {!formSubjects.length && form.classId && <div className="mx-5 mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800"><AlertTriangle className="h-4 w-4" />No Class–Subject mapping exists for this selection. Configure it in Academic Management first.</div>}
+      <div className="flex justify-end gap-2 border-t border-slate-200 p-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700">Cancel</button><button disabled={saving || !formSubjects.length} className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-teal-700 disabled:bg-slate-300"><Save className="h-4 w-4" />{saving ? 'Saving…' : 'Save Routine'}</button></div></form></div>}
+    <ConfirmDialog isOpen={Boolean(deleting)} onClose={() => setDeleting(null)} onConfirm={remove} title="Delete routine slot?" description={`${deleting?.weekday || ''} ${deleting?.startTime || ''} ${deleting?.className || ''} routine will be permanently removed.`} confirmText="Delete slot" />
+  </div>;
+}
+
+function Select({ label, value, onChange, options, placeholder, required }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; placeholder?: string; required?: boolean }) {
+  return <label className="block min-w-0"><span className="mb-1.5 block text-xs font-bold text-slate-600">{label}{required && <span className="text-rose-500"> *</span>}</span><select required={required} value={value} onChange={(event) => onChange(event.target.value)} className="form-input"><option value="">{placeholder || `Select ${label.toLowerCase()}`}</option>{options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>;
+}
+function Input({ label, value, onChange, type, required }: { label: string; value: string; onChange: (value: string) => void; type: string; required?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">{label}{required && <span className="text-rose-500"> *</span>}</span><input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="form-input" /></label>;
 }

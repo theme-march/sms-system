@@ -16,7 +16,7 @@ import {
   Loader2,
   Building2,
 } from 'lucide-react';
-import { getEmployeeById } from '@/src/services/staff.service';
+import { addEmploymentHistory, addStaffDocument, getEmployeeById } from '@/src/services/staff.service';
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -57,41 +57,22 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
     fetchEmployee();
   }, [id]);
 
-  const handleAddDocument = (e: React.FormEvent) => {
+  const handleAddDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docData.title || !docData.fileUrl) return;
 
-    const newDoc = {
-      id: `doc-${Date.now()}`,
-      title: docData.title,
-      documentType: docData.documentType,
-      fileUrl: docData.fileUrl,
-      uploadedAt: new Date().toISOString().split('T')[0],
-    };
-
-    setEmployee((prev: any) => ({
-      ...prev,
-      documents: [...(prev.documents || []), newDoc],
-    }));
-
+    await addStaffDocument({ employeeId: id }, docData);
+    await fetchEmployee();
     setDocModalOpen(false);
     setDocData({ title: '', documentType: 'Employment Contract', fileUrl: '' });
   };
 
-  const handleAddHistory = (e: React.FormEvent) => {
+  const handleAddHistory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!histData.companyName || !histData.designation) return;
 
-    const newHist = {
-      id: `hist-${Date.now()}`,
-      ...histData,
-    };
-
-    setEmployee((prev: any) => ({
-      ...prev,
-      employmentHistories: [...(prev.employmentHistories || []), newHist],
-    }));
-
+    await addEmploymentHistory({ employeeId: id }, histData);
+    await fetchEmployee();
     setHistModalOpen(false);
     setHistData({ companyName: '', designation: '', startDate: '', endDate: '', responsibilities: '' });
   };
