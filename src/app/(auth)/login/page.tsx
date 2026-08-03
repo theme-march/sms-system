@@ -1,57 +1,87 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { School, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
-import { FormField } from '@/src/components/forms/FormField';
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { School, ArrowRight, ShieldCheck } from "lucide-react";
+import { FormField } from "@/src/components/forms/FormField";
+import { defaultWebsiteContent } from "@/src/lib/website-content";
+import { websiteThemeStyle } from "@/src/lib/website-theme";
+import styles from "./login-theme.module.css";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [schoolName, setSchoolName] = useState("School Management System");
+  const [theme, setTheme] = useState(defaultWebsiteContent.theme);
+
+  useEffect(() => {
+    fetch("/api/website")
+      .then((response) => response.json())
+      .then((data) => {
+        if (data?.school?.name) setSchoolName(data.school.name);
+        if (data?.content?.theme) setTheme(data.content.theme);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
       if (res.ok && data.ok) {
-        const nextPath = new URLSearchParams(window.location.search).get('next');
-        router.replace(nextPath?.startsWith('/') ? nextPath : data.redirectTo || '/dashboard');
+        const nextPath = new URLSearchParams(window.location.search).get(
+          "next",
+        );
+        router.replace(
+          nextPath?.startsWith("/")
+            ? nextPath
+            : data.redirectTo || "/dashboard",
+        );
         router.refresh();
       } else {
-        setError(data?.error || 'Invalid credentials.');
+        setError(data?.error || "Invalid credentials.");
       }
     } catch (err) {
       console.error(err);
-      setError('An error occurred. Please try again.');
+      setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200/80 p-8 space-y-6">
+    <div
+      className={`${styles.page} flex min-h-screen flex-col items-center justify-center p-4`}
+      style={websiteThemeStyle(theme)}
+    >
+      <div
+        className={`${styles.card} w-full max-w-md space-y-6 rounded-2xl border p-8`}
+      >
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-teal-600 text-white shadow-md mb-2">
+          <div
+            className={`${styles.mark} mb-2 inline-flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-md`}
+          >
             <School className="w-6 h-6" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            School Management System
+            {schoolName}
           </h1>
-          <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider">
+          <p
+            className={`${styles.accent} text-xs font-semibold uppercase tracking-wider`}
+          >
             Management Console Portal
           </p>
         </div>
@@ -83,7 +113,11 @@ export default function LoginPage() {
 
           <div className="flex items-center justify-between text-xs text-slate-500">
             <label className="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" defaultChecked className="rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+              <input
+                type="checkbox"
+                defaultChecked
+                className={`${styles.checkbox} rounded border-slate-300`}
+              />
               <span>Remember session</span>
             </label>
             <span className="text-slate-400">7-day secure session</span>
@@ -92,15 +126,15 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+            className={`${styles.submit} flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:shadow-lg disabled:opacity-50`}
           >
-            <span>{loading ? 'Authenticating...' : 'Sign In to Portal'}</span>
+            <span>{loading ? "Authenticating..." : "Sign In to Portal"}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
-          <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+          <ShieldCheck className={`${styles.accent} h-3.5 w-3.5`} />
           <span>Your session is encrypted and protected.</span>
         </div>
       </div>

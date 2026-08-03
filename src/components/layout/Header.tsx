@@ -1,19 +1,12 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import {
-  Menu,
-  Bell,
-  User,
-  LogOut,
-  Shield,
-  ChevronDown,
-} from 'lucide-react';
-import { LanguageSwitcher } from '@/src/components/ui/LanguageSwitcher';
-import { canAccessPermission } from '@/src/config/access-control';
-import { PERMISSIONS } from '@/src/config/permissions';
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Menu, Bell, User, LogOut, Shield, ChevronDown } from "lucide-react";
+import { LanguageSwitcher } from "@/src/components/ui/LanguageSwitcher";
+import { canAccessPermission } from "@/src/config/access-control";
+import { PERMISSIONS } from "@/src/config/permissions";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -36,17 +29,17 @@ export function Header({
   const handleSignOut = async () => {
     setIsDropdownOpen(false);
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' });
-      if (!response.ok) throw new Error('Logout request failed');
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Logout request failed");
     } catch (err) {
-      console.error('Logout failed', err);
+      console.error("Logout failed", err);
     }
-    router.replace('/login');
+    router.replace("/login");
     router.refresh();
   };
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-2xs backdrop-blur-sm lg:left-64 lg:px-8">
+    <header className="dashboard-header fixed inset-x-0 top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-2xs backdrop-blur-sm lg:left-64 lg:px-8">
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleMobileSidebar}
@@ -85,7 +78,9 @@ export function Header({
             className="flex items-center gap-3 p-1 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
           >
             <div className="hidden md:block text-right">
-              <p className="text-sm font-bold text-slate-700 leading-none">{userName}</p>
+              <p className="text-sm font-bold text-slate-700 leading-none">
+                {userName}
+              </p>
               <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-1">
                 {userRole}
               </p>
@@ -100,26 +95,40 @@ export function Header({
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
               <div className="px-3 py-2 border-b border-slate-100">
                 <p className="text-xs font-bold text-slate-900">{userName}</p>
-                <p className="text-[10px] text-slate-400 uppercase font-semibold">{userRole}</p>
+                <p className="text-[10px] text-slate-400 uppercase font-semibold">
+                  {userRole}
+                </p>
               </div>
 
-              {canAccessPermission(permissions, roles, PERMISSIONS.SCHOOL_SETTINGS_MANAGE) && <Link
-                href="/dashboard/settings"
-                onClick={() => setIsDropdownOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <Shield className="w-3.5 h-3.5 text-slate-400" />
-                <span>School Settings</span>
-              </Link>}
+              {canAccessPermission(
+                permissions,
+                roles,
+                PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+              ) && (
+                <Link
+                  href="/dashboard/settings"
+                  onClick={() => setIsDropdownOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Shield className="w-3.5 h-3.5 text-slate-400" />
+                  <span>School Settings</span>
+                </Link>
+              )}
 
-              {canAccessPermission(permissions, roles, PERMISSIONS.USERS_VIEW) && <Link
-                href="/dashboard/users"
-                onClick={() => setIsDropdownOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <span>My Profile</span>
-              </Link>}
+              {canAccessPermission(
+                permissions,
+                roles,
+                PERMISSIONS.USERS_VIEW,
+              ) && (
+                <Link
+                  href="/dashboard/users"
+                  onClick={() => setIsDropdownOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>My Profile</span>
+                </Link>
+              )}
 
               <div className="border-t border-slate-100 my-1" />
 

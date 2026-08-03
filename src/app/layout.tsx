@@ -2,8 +2,8 @@ import React from 'react';
 import '@/src/index.css';
 
 export const metadata = {
-  title: 'School Management System',
-  description: 'Enterprise School Management System with BDT billing, EIIN registration, and RBAC.',
+  title: 'School Website & Management System',
+  description: 'Official school website, notices, academic information and online admission.',
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full bg-slate-50">
+    <html lang="bn" className="h-full bg-slate-50">
       <body suppressHydrationWarning className="h-full min-h-screen text-slate-800 font-sans antialiased bg-slate-50 selection:bg-teal-100 selection:text-teal-900">
         {children}
       </body>

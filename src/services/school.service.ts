@@ -1,4 +1,4 @@
-import prisma from '@/src/lib/db/prisma';
+import prisma from "@/src/lib/db/prisma";
 
 export interface SchoolSettingsUpdateInput {
   name: string;
@@ -21,11 +21,15 @@ export interface SchoolSettingsUpdateInput {
 export async function getSchoolProfile(schoolId?: string) {
   return prisma.school.findFirst({
     where: schoolId ? { id: schoolId, deletedAt: null } : { deletedAt: null },
-    include: { settings: true, branding: true },
+    include: { settings: true, branding: true, websiteSettings: true },
   });
 }
 
-export async function updateSchoolProfile(schoolId: string, data: SchoolSettingsUpdateInput, userId?: string) {
+export async function updateSchoolProfile(
+  schoolId: string,
+  data: SchoolSettingsUpdateInput,
+  userId?: string,
+) {
   return prisma.$transaction(async (tx) => {
     const updated = await tx.school.update({
       where: { id: schoolId },
@@ -41,11 +45,11 @@ export async function updateSchoolProfile(schoolId: string, data: SchoolSettings
         settings: {
           upsert: {
             create: {
-              currency: data.currency || 'BDT',
-              timezone: data.timezone || 'Asia/Dhaka',
-              dateFormat: data.dateFormat || 'DD/MM/YYYY',
-              defaultLanguage: data.defaultLanguage || 'bn',
-              academicYear: data.academicYear || '2026',
+              currency: data.currency || "BDT",
+              timezone: data.timezone || "Asia/Dhaka",
+              dateFormat: data.dateFormat || "DD/MM/YYYY",
+              defaultLanguage: data.defaultLanguage || "bn",
+              academicYear: data.academicYear || "2026",
             },
             update: {
               currency: data.currency,
@@ -80,8 +84,8 @@ export async function updateSchoolProfile(schoolId: string, data: SchoolSettings
       data: {
         schoolId,
         userId,
-        action: 'UPDATE',
-        module: 'SchoolSettings',
+        action: "UPDATE",
+        module: "SchoolSettings",
         recordId: schoolId,
         details: JSON.stringify({ updatedFields: Object.keys(data) }),
       },

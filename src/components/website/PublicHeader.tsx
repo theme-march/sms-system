@@ -1,0 +1,3 @@
+import { BannerSlider } from './BannerSlider';
+import type { WebsiteContent } from '@/src/lib/website-content';
+export function PublicHeader({content,schoolName}:{content:WebsiteContent;schoolName:string}){return <><BannerSlider banners={content.banners} fallbackTitle={schoolName}/><nav className="school-nav" aria-label="প্রধান মেনু">{content.menu.map((item,index)=><div className="school-nav-item" key={`${item.label}-${index}`}><a className="school-nav-link" href={item.href} style={{color:item.color}}>{item.label}{item.children?.length?<span className="nav-caret">⌄</span>:null}</a>{item.children?.length?<div className="school-submenu">{item.children.map((child,i)=><a key={i} href={child.href}>{child.label}</a>)}</div>:null}</div>)}</nav></>}

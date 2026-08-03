@@ -64,6 +64,7 @@ model School {
 
   settings              SchoolSettings?
   branding              BrandingSettings?
+  websiteSettings       WebsiteSettings?
   users                 User[]
   classes               Class[]
   sections              Section[]
@@ -95,6 +96,18 @@ model School {
   auditLogs             AuditLog[]
 
   @@map("schools")
+}
+
+model WebsiteSettings {
+  id        String   @id @default(uuid())
+  schoolId  String   @unique @map("school_id")
+  content   Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("website_settings")
 }
 
 model SchoolSettings {

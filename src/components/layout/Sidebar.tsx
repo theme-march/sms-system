@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   GraduationCap,
@@ -11,6 +11,7 @@ import {
   BookOpen,
   CalendarCheck2,
   FileSpreadsheet,
+  FileText,
   Receipt,
   DollarSign,
   ClipboardList,
@@ -23,8 +24,12 @@ import {
   X,
   School,
   CalendarDays,
-} from 'lucide-react';
-import { NAVIGATION_GROUPS, canAccessPermission } from '@/src/config/access-control';
+  Globe,
+} from "lucide-react";
+import {
+  NAVIGATION_GROUPS,
+  canAccessPermission,
+} from "@/src/config/access-control";
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -38,44 +43,70 @@ interface SidebarProps {
 
 const icons = {
   Dashboard: LayoutDashboard,
-  'School Settings': Settings,
-  'User Directory': UserCog,
-  'Roles & RBAC': ShieldCheck,
-  'Academic Management': School,
-  'Student Directory': GraduationCap,
-  'Guardians Directory': Users,
-  'Online Admissions': UserCheck,
+  "School Settings": Settings,
+  "Website Settings": Globe,
+  "Website Overview": Globe,
+  "Custom Pages": FileText,
+  "Banner Slider": FileSpreadsheet,
+  "Home Page": School,
+  "About Page": Building2,
+  "Academics Page": BookOpen,
+  "Programs Page": GraduationCap,
+  "Gallery Page": FileSpreadsheet,
+  "Events Page": CalendarDays,
+  "Admission Page": UserCheck,
+  "Teachers Page": Users,
+  "Facilities Page": Building2,
+  "Achievements Page": BarChart3,
+  "Downloads Page": FileSpreadsheet,
+  "Contact Page": Users,
+  "User Directory": UserCog,
+  "Roles & RBAC": ShieldCheck,
+  "Academic Management": School,
+  "Student Directory": GraduationCap,
+  "Guardians Directory": Users,
+  "Online Admissions": UserCheck,
   Departments: Building2,
   Designations: ShieldCheck,
-  'Teachers Roster': Users,
-  'Employees Directory': UserCog,
-  'Teacher Assignments': BookOpen,
-  'Teacher Portal': UserCheck,
-  'Student Portal': GraduationCap,
-  'Parent Portal': Users,
-  'Attendance Tracker': CalendarCheck2,
-  'Class Routines': Clock,
-  'Exams & Results': FileSpreadsheet,
-  'Homework Assignments': BookOpen,
-  'Leave Management': CalendarDays,
-  'Fee Structures & Invoices': Receipt,
-  'Payroll Management': DollarSign,
-  'Reports & Analytics': BarChart3,
-  'System Audit Logs': ClipboardList,
-  'My Leave & Salary': CalendarDays,
+  "Teachers Roster": Users,
+  "Employees Directory": UserCog,
+  "Teacher Assignments": BookOpen,
+  "Teacher Portal": UserCheck,
+  "Student Portal": GraduationCap,
+  "Parent Portal": Users,
+  "Attendance Tracker": CalendarCheck2,
+  "Class Routines": Clock,
+  "Exams & Results": FileSpreadsheet,
+  "Homework Assignments": BookOpen,
+  "Leave Management": CalendarDays,
+  "Fee Structures & Invoices": Receipt,
+  "Payroll Management": DollarSign,
+  "Reports & Analytics": BarChart3,
+  "System Audit Logs": ClipboardList,
+  "My Leave & Salary": CalendarDays,
 } as const;
 
-export function Sidebar({ isMobileOpen, onCloseMobile, permissions, roles, schoolName, schoolEiin, currency }: SidebarProps) {
+export function Sidebar({
+  isMobileOpen,
+  onCloseMobile,
+  permissions,
+  roles,
+  schoolName,
+  schoolEiin,
+  currency,
+}: SidebarProps) {
   const pathname = usePathname();
   const navGroups = NAVIGATION_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => canAccessPermission(permissions, roles, item.permission)),
+    items: group.items.filter((item) =>
+      canAccessPermission(permissions, roles, item.permission),
+    ),
   })).filter((group) => group.items.length > 0);
 
   const sidebarContent = (
-    <div className="flex h-full min-h-0 flex-col border-r border-slate-200/80 bg-white">
+    <div className="dashboard-sidebar flex h-full min-h-0 flex-col border-r border-slate-200/80 bg-white">
       {/* Brand Header */}
-      <div className="p-5 border-b border-teal-800 bg-teal-700 flex items-center justify-between shrink-0">
+      <div className="dashboard-brand p-5 border-b border-teal-800 bg-teal-700 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="w-10 h-10 rounded-lg bg-white text-teal-700 flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
             SMS
@@ -106,10 +137,14 @@ export function Sidebar({ isMobileOpen, onCloseMobile, permissions, roles, schoo
             </p>
             <div className="space-y-1">
               {group.items.map((item) => {
+                const itemPath = item.href.split("?")[0];
                 const isActive =
-                  pathname === item.href ||
-                  (item.href !== '/dashboard' && pathname.startsWith(item.href));
-                const Icon = icons[item.label as keyof typeof icons] || LayoutDashboard;
+                  pathname === itemPath ||
+                  (itemPath !== "/dashboard" &&
+                    itemPath !== "/dashboard/website-settings" &&
+                    pathname.startsWith(`${itemPath}/`));
+                const Icon =
+                  icons[item.label as keyof typeof icons] || LayoutDashboard;
 
                 return (
                   <Link
@@ -118,16 +153,18 @@ export function Sidebar({ isMobileOpen, onCloseMobile, permissions, roles, schoo
                     onClick={onCloseMobile}
                     className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
                       isActive
-                        ? 'bg-teal-50 text-teal-700 font-semibold shadow-2xs'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                        ? "bg-teal-50 text-teal-700 font-semibold shadow-2xs"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium"
                     }`}
                   >
                     <span
                       className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                        isActive ? 'bg-teal-600' : 'bg-slate-300'
+                        isActive ? "bg-teal-600" : "bg-slate-300"
                       }`}
                     />
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-teal-600' : 'text-slate-400'}`} />
+                    <Icon
+                      className={`w-4 h-4 shrink-0 ${isActive ? "text-teal-600" : "text-slate-400"}`}
+                    />
                     <span className="truncate">{item.label}</span>
                   </Link>
                 );
@@ -140,7 +177,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile, permissions, roles, schoo
       {/* Footer Info */}
       <div className="p-4 border-t border-slate-100 bg-white shrink-0">
         <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
-          <span>{schoolEiin ? `EIIN: ${schoolEiin}` : 'School Portal'}</span>
+          <span>{schoolEiin ? `EIIN: ${schoolEiin}` : "School Portal"}</span>
           <span className="text-teal-600 font-bold">{currency}</span>
         </div>
       </div>

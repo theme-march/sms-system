@@ -1,0 +1,43 @@
+.page {
+  background-color: var(--site-background);
+  background-image:
+    radial-gradient(
+      circle at 20% 15%,
+      color-mix(in srgb, var(--site-primary) 9%, transparent),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 85% 80%,
+      color-mix(in srgb, var(--site-secondary) 12%, transparent),
+      transparent 34%
+    );
+}
+
+.card {
+  border-color: var(--site-border);
+  background: color-mix(in srgb, #fff 97%, var(--site-background));
+  box-shadow: 0 24px 60px
+    color-mix(in srgb, var(--site-secondary) 24%, transparent);
+}
+
+.mark,
+.submit {
+  background: var(--site-primary);
+}
+
+.accent {
+  color: var(--site-primary);
+}
+
+.checkbox {
+  accent-color: var(--site-primary);
+}
+
+.submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--site-primary) 82%, #000);
+}
+
+.page input:focus {
+  border-color: var(--site-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-primary) 16%, transparent) !important;
+}
