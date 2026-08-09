@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowRight,
   BarChart3,
   CalendarDays,
   CheckCircle2,
@@ -32,6 +33,7 @@ const emptyData: Data = {
   examSubjects: [],
   routines: [],
   marks: [],
+  marksScope: null,
   roster: [],
   results: [],
   publications: [],
@@ -65,6 +67,7 @@ export default function ExaminationsPage() {
     endDate: today,
     classId: "",
     sectionId: "",
+    assignments: [] as Array<{ classId: string; sectionId: string }>,
   });
   const [routineForm, setRoutineForm] = useState({
     academicYearId: "",
@@ -132,18 +135,62 @@ export default function ExaminationsPage() {
       };
     setMarkRows(next);
   }, [data.roster]);
+  useEffect(() => {
+    if (tab !== "marks" || !Array.isArray(data.marksScope)) return;
+    const currentIsAssigned = data.marksScope.some(
+      (scope: any) =>
+        scope.examId === examId &&
+        scope.classId === classId &&
+        scope.sectionId === sectionId &&
+        scope.subjectId === subjectId,
+    );
+    if (currentIsAssigned) return;
+    const firstAssigned =
+      data.marksScope.find((scope: any) => scope.examId === examId) ||
+      data.marksScope[0];
+    if (!firstAssigned) {
+      setExamId("");
+      setClassId("");
+      setSectionId("");
+      setSubjectId("");
+      return;
+    }
+    setExamId(firstAssigned.examId);
+    setClassId(firstAssigned.classId);
+    setSectionId(firstAssigned.sectionId);
+    setSubjectId(firstAssigned.subjectId);
+  }, [classId, data.marksScope, examId, sectionId, subjectId, tab]);
 
   const selectedClass = data.classes.find((item: any) => item.id === classId);
   const examClass =
     selectedClass ||
     data.classes.find((item: any) => item.id === examForm.classId);
   const selectedExam = data.exams.find((item: any) => item.id === examId);
+  const selectedPublication = data.publications.find(
+    (item: any) =>
+      item.examId === examId &&
+      (item.classId === classId || item.classId === null) &&
+      item.status === "PUBLISHED",
+  );
+  const selectedResultPublished = Boolean(selectedPublication);
   const examClasses = selectedExam?.classes || [];
   const availableSubjects = Array.from(
     new Map(
       data.examSubjects
         .filter((item: any) => !examId || item.examId === examId)
         .filter((item: any) => !classId || item.classId === classId)
+        .filter(
+          (item: any) =>
+            tab !== "marks" ||
+            !Array.isArray(data.marksScope) ||
+            data.marksScope.some(
+              (scope: any) =>
+                scope.examId === item.examId &&
+                scope.classId === item.classId &&
+                (!sectionId || scope.sectionId === sectionId) &&
+                scope.subjectId === item.subjectId,
+            ),
+        )
         .map((item: any) => [item.subjectId, item]),
     ).values(),
   ) as any[];
@@ -156,6 +203,55 @@ export default function ExaminationsPage() {
   const upcoming = data.exams.filter(
     (item: any) => item.endDate >= today,
   ).length;
+
+  function chooseExam(value: string) {
+    const exam = data.exams.find((item: any) => item.id === value);
+    const marksLink =
+      tab === "marks" && Array.isArray(data.marksScope)
+        ? data.marksScope.find((scope: any) => scope.examId === value)
+        : null;
+    const link = marksLink || exam?.classes?.[0];
+    const nextClass = data.classes.find(
+      (item: any) => item.id === link?.classId,
+    );
+    const nextSubject = marksLink || data.examSubjects.find(
+      (item: any) => item.examId === value && item.classId === link?.classId,
+    );
+    setExamId(value);
+    setClassId(link?.classId || "");
+    setSectionId(link?.sectionId || nextClass?.sections?.[0]?.id || "");
+    setSubjectId(nextSubject?.subjectId || "");
+  }
+
+  function chooseClass(value: string) {
+    const marksLink =
+      tab === "marks" && Array.isArray(data.marksScope)
+        ? data.marksScope.find(
+            (scope: any) => scope.examId === examId && scope.classId === value,
+          )
+        : null;
+    const link = marksLink || selectedExam?.classes?.find(
+      (item: any) => item.classId === value,
+    );
+    const nextClass = data.classes.find((item: any) => item.id === value);
+    const nextSubject = marksLink || data.examSubjects.find(
+      (item: any) => item.examId === examId && item.classId === value,
+    );
+    setClassId(value);
+    setSectionId(link?.sectionId || nextClass?.sections?.[0]?.id || "");
+    setSubjectId(nextSubject?.subjectId || "");
+  }
+
+  function goToTab(nextTab: Tab) {
+    setTab(nextTab);
+    if (
+      !examId &&
+      nextTab !== "overview" &&
+      nextTab !== "setup" &&
+      data.exams[0]
+    )
+      chooseExam(data.exams[0].id);
+  }
 
   async function action(body: object, success: string) {
     setBusy(true);
@@ -170,7 +266,7 @@ export default function ExaminationsPage() {
       if (!response.ok) throw new Error(payload.error || "Operation failed.");
       setMessage({ type: "success", text: success });
       await load();
-      return true;
+      return payload;
     } catch (error) {
       setMessage({
         type: "error",
@@ -201,24 +297,52 @@ export default function ExaminationsPage() {
       endDate: exam?.endDate || today,
       classId: link?.classId || cls?.id || "",
       sectionId: link?.sectionId || cls?.sections[0]?.id || "",
+      assignments: (exam?.classes || []).map((item: any) => ({
+        classId: item.classId,
+        sectionId: item.sectionId || "",
+      })),
     });
     setExamModal(true);
   }
   async function createExam(event: FormEvent) {
     event.preventDefault();
-    const ok = await action(
+    const assignments = [...examForm.assignments];
+    if (
+      examForm.classId &&
+      !assignments.some(
+        (item) =>
+          item.classId === examForm.classId &&
+          item.sectionId === examForm.sectionId,
+      )
+    )
+      assignments.push({
+        classId: examForm.classId,
+        sectionId: examForm.sectionId,
+      });
+    const saved = await action(
       {
         action: editingExam ? "updateExam" : "createExam",
         ...(editingExam ? { id: editingExam.id } : {}),
         ...examForm,
+        assignments,
       },
       editingExam
         ? "Exam details updated."
         : "Exam created with its class subjects.",
     );
-    if (ok) {
+    if (saved) {
       setExamModal(false);
-      setTab("setup");
+      if (!editingExam && saved.id) {
+        setExamId(saved.id);
+        setClassId(assignments[0]?.classId || "");
+        setSectionId(assignments[0]?.sectionId || "");
+        setSubjectId("");
+        setTab("routine");
+        setMessage({
+          type: "success",
+          text: "Exam created. Now add the schedule for each subject.",
+        });
+      } else setTab("setup");
     }
   }
   function openRoutine(row?: any) {
@@ -294,6 +418,17 @@ export default function ExaminationsPage() {
     }
   }
   async function saveMarks() {
+    const incomplete = data.roster.filter((student: any) => {
+      const row = markRows[student.studentId];
+      return !row?.absent && !String(row?.marks ?? "").trim();
+    });
+    if (incomplete.length) {
+      setMessage({
+        type: "error",
+        text: `${incomplete.length} student mark(s) are blank. Enter marks or select Absent.`,
+      });
+      return;
+    }
     const rows = data.roster.map((student: any) => ({
       studentId: student.studentId,
       marks: Number(markRows[student.studentId]?.marks || 0),
@@ -307,7 +442,7 @@ export default function ExaminationsPage() {
   }
   async function verifyMarks() {
     await action(
-      { action: "verifyMarks", examId, classId, subjectId },
+      { action: "verifyMarks", examId, classId, sectionId, subjectId },
       "Marks verified and locked.",
     );
   }
@@ -315,7 +450,14 @@ export default function ExaminationsPage() {
     const reason = window.prompt("Why are these marks being unlocked?");
     if (!reason) return;
     await action(
-      { action: "unlockMarks", examId, classId, subjectId, reason },
+      {
+        action: "unlockMarks",
+        examId,
+        classId,
+        sectionId,
+        subjectId,
+        reason,
+      },
       "Marks unlocked for authorized correction.",
     );
   }
@@ -354,7 +496,7 @@ export default function ExaminationsPage() {
       <div className="print:hidden">
         <PageHeader
           title="Examinations & Results"
-          subtitle="Plan exams, publish schedules, enter and verify marks, calculate and publish results"
+          subtitle="Create exams, build routines, enter marks and publish results step by step"
           breadcrumbs={[{ label: "Examinations" }]}
           action={
             <div className="flex gap-2">
@@ -389,16 +531,16 @@ export default function ExaminationsPage() {
       <nav className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm print:hidden">
         {(
           [
-            ["overview", BarChart3, "Overview"],
-            ["setup", GraduationCap, "Exam Setup"],
-            ["routine", CalendarDays, "Exam Routine"],
-            ["marks", FileSpreadsheet, "Marks Entry"],
-            ["results", CheckCircle2, "Results"],
+            ["overview", BarChart3, "Quick Guide"],
+            ["setup", GraduationCap, "1. Exams"],
+            ["routine", CalendarDays, "2. Routine"],
+            ["marks", FileSpreadsheet, "3. Marks Entry"],
+            ["results", CheckCircle2, "4. Results"],
           ] as const
         ).map(([key, Icon, label]) => (
           <button
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => goToTab(key)}
             className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold ${tab === key ? "bg-teal-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}
           >
             <Icon className="h-4 w-4" />
@@ -417,26 +559,40 @@ export default function ExaminationsPage() {
             <Metric label="Published exams" value={published} />
           </div>
           <section className="card p-5">
-            <Title icon={ClipboardList} text="Examination workflow" />
-            <div className="mt-4 grid gap-3 md:grid-cols-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <Title icon={ClipboardList} text="How it works" />
+                <p className="mt-1 text-xs text-slate-500">
+                  Complete one step, then continue to the next. Click a step card to open it.
+                </p>
+              </div>
+              {!data.exams.length && data.permissions.manage ? (
+                <button className="btn-primary" onClick={() => openExam()}>
+                  <Plus className="h-4 w-4" /> Get Started
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
               {[
-                "1. Create exam",
-                "2. Build routine",
-                "3. Enter marks",
-                "4. Verify & calculate",
-                "5. Publish results",
+                { tab: "setup" as Tab, title: "Create Exam", detail: "Add a name, dates and one or more classes" },
+                { tab: "routine" as Tab, title: "Build Routine", detail: "Set the date, time and room for every subject" },
+                { tab: "marks" as Tab, title: "Enter & Verify Marks", detail: "Save marks, then Verify & Lock" },
+                { tab: "results" as Tab, title: "Publish Results", detail: "Calculate, review and publish results" },
               ].map((item, index) => (
-                <div
-                  key={item}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                <button
+                  type="button"
+                  key={item.title}
+                  onClick={() => goToTab(item.tab)}
+                  className="group rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-teal-300 hover:bg-teal-50"
                 >
                   <span className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
                     {index + 1}
                   </span>
-                  <p className="text-xs font-bold text-slate-700">
-                    {item.slice(3)}
-                  </p>
-                </div>
+                  <span className="flex items-center justify-between gap-2 text-xs font-bold text-slate-700">
+                    {item.title}<ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-teal-600" />
+                  </span>
+                  <small className="mt-1 block text-[11px] leading-5 text-slate-500">{item.detail}</small>
+                </button>
               ))}
             </div>
           </section>
@@ -460,21 +616,17 @@ export default function ExaminationsPage() {
 
       {tab === "routine" && (
         <>
+          <StepHelp
+            number="2"
+            title="Build the examination routine"
+            detail="Select the exam, class, section and subject. Add a date and time for each subject."
+          />
           <FilterBar
             data={data}
             examId={examId}
-            setExamId={(value: string) => {
-              setExamId(value);
-              setClassId("");
-              setSectionId("");
-              setSubjectId("");
-            }}
+            setExamId={chooseExam}
             classId={classId}
-            setClassId={(value: string) => {
-              setClassId(value);
-              setSectionId("");
-              setSubjectId("");
-            }}
+            setClassId={chooseClass}
             sectionId={sectionId}
             setSectionId={setSectionId}
             subjectId={subjectId}
@@ -569,21 +721,21 @@ export default function ExaminationsPage() {
 
       {tab === "marks" && (
         <>
+          <StepHelp
+            number="3"
+            title="Enter and verify marks"
+            detail={
+              Array.isArray(data.marksScope)
+                ? "Only your assigned classes, sections and subjects are available. Enter the marks and select Save Marks."
+                : "Select the four options to load students. Save Marks first; when everything is correct, select Verify & Lock."
+            }
+          />
           <FilterBar
             data={data}
             examId={examId}
-            setExamId={(value: string) => {
-              setExamId(value);
-              setClassId("");
-              setSectionId("");
-              setSubjectId("");
-            }}
+            setExamId={chooseExam}
             classId={classId}
-            setClassId={(value: string) => {
-              setClassId(value);
-              setSectionId("");
-              setSubjectId("");
-            }}
+            setClassId={chooseClass}
             sectionId={sectionId}
             setSectionId={setSectionId}
             subjectId={subjectId}
@@ -591,6 +743,7 @@ export default function ExaminationsPage() {
             examClasses={examClasses}
             selectedClass={selectedClass}
             availableSubjects={availableSubjects}
+            marksScope={data.marksScope}
           />
           <section className="card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -610,7 +763,7 @@ export default function ExaminationsPage() {
                       onClick={unlockMarks}
                       className="btn-secondary"
                     >
-                      Unlock
+                    Unlock for Correction
                     </button>
                   )}
                 {data.permissions.verifyMarks && (
@@ -618,6 +771,9 @@ export default function ExaminationsPage() {
                     disabled={
                       !data.roster.length ||
                       busy ||
+                      data.roster.some(
+                        (row: any) => row.existingMark === null,
+                      ) ||
                       data.roster.every((row: any) => row.locked)
                     }
                     onClick={verifyMarks}
@@ -749,20 +905,17 @@ export default function ExaminationsPage() {
 
       {tab === "results" && (
         <>
+          <StepHelp
+            number="4"
+            title="Calculate and publish results"
+            detail="After every subject is verified and locked, calculate the results. Review the list, then publish."
+          />
           <FilterBar
             data={data}
             examId={examId}
-            setExamId={(value: string) => {
-              setExamId(value);
-              setClassId("");
-              setSectionId("");
-              setSubjectId("");
-            }}
+            setExamId={chooseExam}
             classId={classId}
-            setClassId={(value: string) => {
-              setClassId(value);
-              setSectionId("");
-            }}
+            setClassId={chooseClass}
             sectionId={sectionId}
             setSectionId={setSectionId}
             subjectId=""
@@ -786,16 +939,18 @@ export default function ExaminationsPage() {
                     className="btn-secondary"
                   >
                     <BarChart3 className="h-4 w-4" />
-                    Calculate
+                    Calculate Results
                   </button>
                 )}
                 {data.permissions.publish && selectedExam && (
                   <button
                     disabled={!data.results.length || busy}
-                    onClick={() => publish(!selectedExam.isPublished)}
+                    onClick={() => publish(!selectedResultPublished)}
                     className="btn-primary"
                   >
-                    {selectedExam.isPublished ? "Unpublish" : "Publish Results"}
+                    {selectedResultPublished
+                      ? "Unpublish Results"
+                      : "Publish Results"}
                   </button>
                 )}
               </div>
@@ -856,8 +1011,8 @@ export default function ExaminationsPage() {
           title={editingExam ? "Edit Examination" : "Create Examination"}
           subtitle={
             editingExam
-              ? "Update the official exam name, term and date range."
-              : "Class subjects are attached automatically from Academic Management."
+              ? "Update the name and dates, or add more classes if needed."
+              : "Add one or more classes and sections. Subjects are attached automatically."
           }
           close={() => setExamModal(false)}
         >
@@ -932,6 +1087,80 @@ export default function ExaminationsPage() {
                 }))}
                 placeholder="All sections"
               />
+              <div className="md:col-span-2 xl:col-span-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-slate-700">Selected classes and sections</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Choose a class and section above, then select Add.</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!examForm.classId}
+                    onClick={() => {
+                      if (
+                        examForm.assignments.some(
+                          (item) =>
+                            item.classId === examForm.classId &&
+                            item.sectionId === examForm.sectionId,
+                        )
+                      )
+                        return;
+                      setExamForm({
+                        ...examForm,
+                        assignments: [
+                          ...examForm.assignments,
+                          {
+                            classId: examForm.classId,
+                            sectionId: examForm.sectionId,
+                          },
+                        ],
+                      });
+                    }}
+                    className="btn-secondary"
+                  >
+                    <Plus className="h-4 w-4" /> Add
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {examForm.assignments.length ? (
+                    examForm.assignments.map((assignment, index) => {
+                      const assignedClass = data.classes.find(
+                        (item: any) => item.id === assignment.classId,
+                      );
+                      const assignedSection = assignedClass?.sections.find(
+                        (item: any) => item.id === assignment.sectionId,
+                      );
+                      return (
+                        <span
+                          key={`${assignment.classId}-${assignment.sectionId}-${index}`}
+                          className="inline-flex items-center gap-2 rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                        >
+                          {assignedClass?.name || "Class"} · {assignedSection?.name || "All sections"}
+                          {!editingExam ? (
+                            <button
+                              type="button"
+                              aria-label="Remove class"
+                              onClick={() =>
+                                setExamForm({
+                                  ...examForm,
+                                  assignments: examForm.assignments.filter(
+                                    (_, itemIndex) => itemIndex !== index,
+                                  ),
+                                })
+                              }
+                              className="text-rose-500 hover:text-rose-700"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span className="text-xs text-slate-400">The current selection will be added when you save.</span>
+                  )}
+                </div>
+              </div>
             </div>
             <Footer
               busy={busy}
@@ -1152,9 +1381,22 @@ function FilterBar({
   examClasses,
   selectedClass,
   availableSubjects,
+  marksScope = null,
   hideSubject = false,
 }: any) {
-  const linkedClassIds = new Set(examClasses.map((item: any) => item.classId));
+  const scopedLinks = Array.isArray(marksScope)
+    ? marksScope.filter((item: any) => item.examId === examId)
+    : examClasses;
+  const linkedClassIds = new Set(scopedLinks.map((item: any) => item.classId));
+  const classLinks = scopedLinks.filter(
+    (item: any) => item.classId === classId,
+  );
+  const allowsAllSections = classLinks.some((item: any) => !item.sectionId);
+  const linkedSectionIds = new Set(
+    classLinks.flatMap((item: any) =>
+      item.sectionId ? [item.sectionId] : [],
+    ),
+  );
   return (
     <div
       className={`grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm print:hidden ${hideSubject ? "md:grid-cols-3" : "md:grid-cols-2 xl:grid-cols-4"}`}
@@ -1163,11 +1405,17 @@ function FilterBar({
         label="Examination"
         value={examId}
         change={setExamId}
-        options={data.exams.map((item: any) => ({
+        options={data.exams
+          .filter(
+            (item: any) =>
+              !Array.isArray(marksScope) ||
+              marksScope.some((scope: any) => scope.examId === item.id),
+          )
+          .map((item: any) => ({
           value: item.id,
           label: item.name,
-        }))}
-        placeholder="Select exam"
+          }))}
+        placeholder="Select examination"
       />
       <Select
         label="Class"
@@ -1182,10 +1430,15 @@ function FilterBar({
         label="Section"
         value={sectionId}
         change={setSectionId}
-        options={(selectedClass?.sections || []).map((item: any) => ({
-          value: item.id,
-          label: item.name,
-        }))}
+        options={(selectedClass?.sections || [])
+          .filter(
+            (item: any) =>
+              allowsAllSections || linkedSectionIds.has(item.id),
+          )
+          .map((item: any) => ({
+            value: item.id,
+            label: item.name,
+          }))}
         placeholder="Select section"
       />
       {!hideSubject && (
@@ -1193,10 +1446,22 @@ function FilterBar({
           label="Subject"
           value={subjectId}
           change={setSubjectId}
-          options={availableSubjects.map((item: any) => ({
+          options={availableSubjects
+            .filter(
+              (item: any) =>
+                !Array.isArray(marksScope) ||
+                marksScope.some(
+                  (scope: any) =>
+                    scope.examId === examId &&
+                    scope.classId === classId &&
+                    scope.sectionId === sectionId &&
+                    scope.subjectId === item.subjectId,
+                ),
+            )
+            .map((item: any) => ({
             value: item.subjectId,
             label: `${item.subjectName} (${item.subjectCode})`,
-          }))}
+            }))}
           placeholder="Select subject"
         />
       )}
@@ -1309,6 +1574,27 @@ function Metric({ label, value }: { label: string; value: number }) {
       </p>
       <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
     </div>
+  );
+}
+function StepHelp({
+  number,
+  title,
+  detail,
+}: {
+  number: string;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <section className="flex items-start gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 print:hidden">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-600 text-sm font-bold text-white">
+        {number}
+      </span>
+      <div>
+        <h2 className="text-sm font-bold text-teal-950">{title}</h2>
+        <p className="mt-1 text-xs leading-5 text-teal-800">{detail}</p>
+      </div>
+    </section>
   );
 }
 function Title({ icon: Icon, text }: { icon: any; text: string }) {

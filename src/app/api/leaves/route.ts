@@ -142,6 +142,74 @@ export async function GET(request: NextRequest) {
           })
         : Promise.resolve([]),
     ]);
+    const payrollIds = payrolls.map((item) => item.id);
+    const [
+      salaryPayments,
+      salaryAdjustments,
+      salaryItems,
+      currentAssignment,
+      selfTeacher,
+      selfEmployee,
+    ] = !admin
+      ? await Promise.all([
+          prisma.salaryPayment.findMany({
+            where: { payrollId: { in: payrollIds } },
+            orderBy: { paymentDate: "desc" },
+          }),
+          prisma.payrollAdjustment.findMany({
+            where: { payrollId: { in: payrollIds } },
+            orderBy: { createdAt: "desc" },
+          }),
+          prisma.payrollItem.findMany({
+            where: { payrollId: { in: payrollIds } },
+          }),
+          prisma.employeeSalaryAssignment.findFirst({
+            where: {
+              schoolId: session.schoolId,
+              userId: session.id,
+              isActive: true,
+            },
+            orderBy: { effectiveDate: "desc" },
+          }),
+          prisma.teacher.findFirst({
+            where: { schoolId: session.schoolId, userId: session.id },
+            select: {
+              nameEn: true,
+              employeeCode: true,
+              designation: { select: { nameEn: true } },
+            },
+          }),
+          prisma.employee.findFirst({
+            where: { schoolId: session.schoolId, userId: session.id },
+            select: {
+              nameEn: true,
+              employeeCode: true,
+              designation: { select: { nameEn: true } },
+            },
+          }),
+        ])
+      : [[], [], [], null, null, null];
+    const currentStructure = currentAssignment
+      ? await prisma.salaryStructure.findFirst({
+          where: {
+            id: currentAssignment.salaryStructureId,
+            schoolId: session.schoolId,
+            isActive: true,
+          },
+        })
+      : null;
+    const currentComponents = currentStructure
+      ? await prisma.salaryComponent.findMany({
+          where: { salaryStructureId: currentStructure.id, isActive: true },
+          orderBy: [{ type: "asc" }, { name: "asc" }],
+        })
+      : [];
+    const selfSchool = !admin
+      ? await prisma.school.findUnique({
+          where: { id: session.schoolId },
+          select: { name: true },
+        })
+      : null;
     const people = [
       ...teachers.map((x) => ({ ...x, type: "Teacher" })),
       ...employees.map((x) => ({ ...x, type: "Employee" })),
@@ -191,6 +259,14 @@ export async function GET(request: NextRequest) {
       grossSalary: Number(p.grossSalary),
       netSalary: Number(p.netSalary),
       paidAmount: Number(p.paidAmount),
+      dueAmount: Math.max(0, Number(p.netSalary) - Number(p.paidAmount)),
+      totalAllowances: Number(p.totalAllowances),
+      totalDeductions: Number(p.totalDeductions),
+      overtime: Number(p.overtime),
+      bonus: Number(p.bonus),
+      tax: Number(p.tax),
+      loanDeduction: Number(p.loanDeduction),
+      absenceDeduction: Number(p.absenceDeduction),
       deductions:
         Number(p.totalDeductions) +
         Number(p.tax) +
@@ -198,7 +274,33 @@ export async function GET(request: NextRequest) {
         Number(p.loanDeduction),
       period: periodMap.get(p.payrollPeriodId) || null,
       payslip: payslips.find((s) => s.payrollId === p.id) || null,
+      payments: salaryPayments
+        .filter((item) => item.payrollId === p.id)
+        .map((item) => ({
+          ...item,
+          amount: Number(item.amount),
+          paymentDate: item.paymentDate.toISOString(),
+        })),
+      adjustments: salaryAdjustments
+        .filter((item) => item.payrollId === p.id)
+        .map((item) => ({
+          ...item,
+          amount: Number(item.amount),
+          createdAt: item.createdAt.toISOString(),
+        })),
+      items: salaryItems
+        .filter((item) => item.payrollId === p.id)
+        .map((item) => ({ ...item, amount: Number(item.amount) })),
     }));
+    const salaryTotals = salary.reduce(
+      (sum, item) => ({
+        gross: sum.gross + item.grossSalary,
+        net: sum.net + item.netSalary,
+        paid: sum.paid + item.paidAmount,
+        due: sum.due + item.dueAmount,
+      }),
+      { gross: 0, net: 0, paid: 0, due: 0 },
+    );
     return NextResponse.json(
       toClientData({
         canManage:
@@ -210,6 +312,36 @@ export async function GET(request: NextRequest) {
         balances,
         people,
         salary,
+        salaryTotals,
+        salaryProfile: selfTeacher
+          ? { ...selfTeacher, type: "Teacher", schoolName: selfSchool?.name }
+          : selfEmployee
+            ? {
+                ...selfEmployee,
+                type: "Employee",
+                schoolName: selfSchool?.name,
+              }
+            : null,
+        currentSalary:
+          currentAssignment && currentStructure
+            ? {
+                assignmentId: currentAssignment.id,
+                effectiveDate: currentAssignment.effectiveDate
+                  .toISOString()
+                  .slice(0, 10),
+                structure: currentStructure,
+                components: currentComponents.map((item) => ({
+                  ...item,
+                  amount: Number(item.amount),
+                })),
+                estimatedEarnings: currentComponents
+                  .filter((item) => item.type === "EARNING")
+                  .reduce((sum, item) => sum + Number(item.amount), 0),
+                estimatedDeductions: currentComponents
+                  .filter((item) => item.type === "DEDUCTION")
+                  .reduce((sum, item) => sum + Number(item.amount), 0),
+              }
+            : null,
       }),
     );
   } catch (e) {

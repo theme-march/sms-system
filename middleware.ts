@@ -6,7 +6,9 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic =
     pathname === '/login' ||
+    pathname === '/results' ||
     pathname.startsWith('/admission/') ||
+    pathname.startsWith('/api/public/') ||
     pathname.startsWith('/api/auth/');
 
   if (pathname === '/') {

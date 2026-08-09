@@ -5,6 +5,36 @@ import { requirePermission, authorizationStatus } from '@/src/lib/auth/authorize
 import { PERMISSIONS } from '@/src/config/permissions';
 import { createAuditLog } from '@/src/lib/audit';
 
+const MANAGEMENT_ROLES = ['Super Admin', 'School Admin', 'Academic Admin', 'Admission Officer', 'Accountant', 'HR Manager'];
+type AttendanceSessionUser = Awaited<ReturnType<typeof requirePermission>>;
+
+function isTeacherOnly(session: AttendanceSessionUser) {
+  return session.roles.includes('Teacher') && !session.roles.some((role) => MANAGEMENT_ROLES.includes(role));
+}
+
+async function getTeacherAttendanceScope(session: AttendanceSessionUser) {
+  if (!isTeacherOnly(session)) return null;
+  return prisma.teacherAssignment.findMany({
+    where: { schoolId: session.schoolId, status: 'ACTIVE', teacher: { userId: session.id, status: 'ACTIVE' } },
+    select: { academicYearId: true, classId: true, sectionId: true, groupId: true, subjectId: true, isClassTeacher: true },
+  });
+}
+
+function scopeAllowsSelection(
+  scope: NonNullable<Awaited<ReturnType<typeof getTeacherAttendanceScope>>>,
+  input: { academicYearId: string; classId: string; sectionId: string; groupId?: string; subjectId?: string; sessionType: 'DAILY' | 'SUBJECT_WISE' },
+) {
+  return scope.some((assignment) =>
+    assignment.academicYearId === input.academicYearId &&
+    assignment.classId === input.classId &&
+    assignment.sectionId === input.sectionId &&
+    (!input.groupId || !assignment.groupId || assignment.groupId === input.groupId) &&
+    (input.sessionType === 'SUBJECT_WISE'
+      ? assignment.subjectId === input.subjectId
+      : assignment.isClassTeacher),
+  );
+}
+
 const attendanceSchema = z.object({
   academicYearId: z.string().trim().min(1).max(191),
   classId: z.string().trim().min(1).max(191),
@@ -30,6 +60,7 @@ function dateRange(value: string) {
 export async function GET(request: NextRequest) {
   try {
     const session = await requirePermission(PERMISSIONS.ATTENDANCE_VIEW);
+    const teacherScope = await getTeacherAttendanceScope(session);
     const classId = request.nextUrl.searchParams.get('classId') || '';
     const sectionId = request.nextUrl.searchParams.get('sectionId') || '';
     const academicYearId = request.nextUrl.searchParams.get('academicYearId') || '';
@@ -38,6 +69,12 @@ export async function GET(request: NextRequest) {
     const sessionType = request.nextUrl.searchParams.get('sessionType') === 'SUBJECT_WISE' ? 'SUBJECT_WISE' : 'DAILY';
     const date = request.nextUrl.searchParams.get('date') || new Date().toISOString().slice(0, 10);
     const { start, end } = dateRange(date);
+    const requestedSelectionAllowed =
+      !teacherScope ||
+      !classId ||
+      !sectionId ||
+      !academicYearId ||
+      scopeAllowsSelection(teacherScope, { academicYearId, classId, sectionId, groupId, subjectId, sessionType });
 
     const [academicYears, classes, classGroups, classSubjects, students, recent] = await Promise.all([
       prisma.academicYear.findMany({
@@ -60,7 +97,7 @@ export async function GET(request: NextRequest) {
         select: { id: true, academicYearId: true, classId: true, groupId: true, subject: { select: { id: true, nameEn: true, code: true } } },
         orderBy: { subject: { nameEn: 'asc' } },
       }),
-      classId && sectionId ? prisma.student.findMany({
+      classId && sectionId && requestedSelectionAllowed ? prisma.student.findMany({
         where: {
           schoolId: session.schoolId, classId, sectionId, status: 'ACTIVE',
           ...(groupId && academicYearId ? { enrollments: { some: { academicYearId, classId, sectionId, groupId, enrollmentStatus: 'ACTIVE' } } } : {}),
@@ -69,7 +106,12 @@ export async function GET(request: NextRequest) {
         orderBy: [{ rollNumber: 'asc' }, { nameEn: 'asc' }],
       }) : Promise.resolve([]),
       prisma.studentAttendanceRecord.findMany({
-        where: { schoolId: session.schoolId },
+        where: {
+          schoolId: session.schoolId,
+          ...(teacherScope
+            ? { OR: teacherScope.map((assignment) => ({ classId: assignment.classId, sectionId: assignment.sectionId })) }
+            : {}),
+        },
         orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
         take: 50,
       }),
@@ -91,10 +133,22 @@ export async function GET(request: NextRequest) {
     const sectionMap = new Map(sectionNames.map((item) => [item.id, item.name]));
 
     return NextResponse.json({
-      academicYears,
-      classes,
+      academicYears: teacherScope
+        ? academicYears.filter((year) => teacherScope.some((assignment) => assignment.academicYearId === year.id))
+        : academicYears,
+      classes: teacherScope
+        ? classes
+            .filter((schoolClass) => teacherScope.some((assignment) => assignment.classId === schoolClass.id))
+            .map((schoolClass) => ({
+              ...schoolClass,
+              sections: schoolClass.sections.filter((section) => teacherScope.some((assignment) => assignment.classId === schoolClass.id && assignment.sectionId === section.id)),
+            }))
+        : classes,
       classGroups: classGroups.map((item) => ({ id: item.id, academicYearId: item.academicYearId, classId: item.classId, groupId: item.group.id, groupName: item.group.name })),
-      classSubjects: classSubjects.map((item) => ({ id: item.id, academicYearId: item.academicYearId, classId: item.classId, groupId: item.groupId, subjectId: item.subject.id, subjectName: item.subject.nameEn, subjectCode: item.subject.code })),
+      classSubjects: classSubjects
+        .filter((item) => !teacherScope || teacherScope.some((assignment) => (!item.academicYearId || assignment.academicYearId === item.academicYearId) && assignment.classId === item.classId && assignment.subjectId === item.subject.id && (!item.groupId || item.groupId === assignment.groupId)))
+        .map((item) => ({ id: item.id, academicYearId: item.academicYearId, classId: item.classId, groupId: item.groupId, subjectId: item.subject.id, subjectName: item.subject.nameEn, subjectCode: item.subject.code })),
+      attendanceScope: teacherScope,
       canManage: session.roles.includes('Super Admin') || session.permissions.includes(PERMISSIONS.ATTENDANCE_MANAGE),
       canManageAcademic: session.roles.includes('Super Admin') || session.permissions.includes(PERMISSIONS.ACADEMIC_MANAGE),
       roster: students.map((student) => ({
@@ -130,6 +184,13 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid attendance data.' }, { status: 400 });
     const input = parsed.data;
     if (input.sessionType === 'SUBJECT_WISE' && !input.subjectId) return NextResponse.json({ error: 'Select a subject for subject-wise attendance.' }, { status: 400 });
+    const teacherScope = await getTeacherAttendanceScope(session);
+    if (teacherScope && !scopeAllowsSelection(teacherScope, input)) {
+      return NextResponse.json(
+        { error: input.sessionType === 'SUBJECT_WISE' ? 'You can take attendance only for your assigned class, section and subject.' : 'Only the assigned class teacher can submit daily attendance.' },
+        { status: 403 },
+      );
+    }
     const { start, end } = dateRange(input.date);
     // The legacy Attendance.date column is MySQL DATE, so use a UTC midnight
     // value to prevent Asia/Dhaka midnight from being serialized as yesterday.

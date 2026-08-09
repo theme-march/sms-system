@@ -1,0 +1,264 @@
+.result-publication {
+  padding: 0;
+  font-family: var(--site-font);
+  color: #25221d;
+}
+.result-page-title {
+  margin-bottom: 14px;
+  border-left: 3px solid var(--site-primary);
+}
+.result-page-title > h2 {
+  font-family: var(--site-font);
+  font-size: 18px;
+  font-weight: 500;
+}
+.result-page-title-body {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+}
+.result-title-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 2px;
+  color: #fff;
+  background: var(--site-primary);
+}
+.result-page-title span { color: var(--site-primary); font-size: 13px; font-weight: 600; }
+.result-page-title p { margin: 2px 0 0; color: #6f675c; font-size: 12.5px; }
+.result-search-card {
+  width: 100%;
+  margin: 0 0 24px;
+  border: 1px solid var(--site-border);
+  background: #fff;
+}
+.result-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  color: #25221d;
+  background: linear-gradient(#fff, #f5f3ee);
+  border-bottom: 1px solid #ddd8ce;
+}
+.result-card-heading > svg { color: var(--site-primary); }
+.result-card-heading h2 { margin: 0; font-family: var(--site-font); font-size: 18px; font-weight: 500; line-height: 1.4; }
+.result-card-heading p { margin: 1px 0 0; color: #746d63; font-size: 12px; }
+.result-search-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px 15px;
+  padding: 16px 14px 18px;
+}
+.result-search-form label { display: grid; gap: 5px; color: #3e3932; font-family: var(--site-font); font-size: 13.5px; font-weight: 600; }
+.result-search-form .result-identifier-field { grid-column: 1 / -1; }
+.result-search-form label b { color: #b3261e; }
+.result-search-form input,
+.result-search-form select {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid #cfc9bd;
+  border-radius: 3px;
+  outline: none;
+  background: #fff;
+  color: #27231e;
+  font-family: var(--site-font);
+  font-size: 13.5px;
+}
+.result-search-form input:focus,
+.result-search-form select:focus { border-color: var(--site-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-primary) 12%, transparent); }
+.result-search-form select:disabled { background: #f2f0eb; cursor: not-allowed; }
+.result-form-actions { grid-column: 1 / -1; display: flex; justify-content: center; gap: 10px; padding-top: 3px; }
+.result-form-actions button,
+.result-sheet-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 3px;
+  font-family: var(--site-font);
+  font-weight: 600;
+  cursor: pointer;
+}
+.result-primary-button { border: 1px solid var(--site-primary); color: #fff; background: var(--site-primary); }
+.result-primary-button:disabled { opacity: .55; cursor: wait; }
+.result-reset-button { border: 1px solid #bdb5a8; color: #4c463d; background: #fff; }
+.result-error,
+.result-info-message { margin: 0 22px 22px; padding: 11px 13px; border-radius: 3px; text-align: center; }
+.result-error { border: 1px solid #f2b8b5; color: #9d201b; background: #fff1f0; }
+.result-info-message { border: 1px solid #dfd4b6; color: #705c24; background: #fff9e9; }
+.result-sheet {
+  max-width: 930px;
+  margin: 0 auto;
+  border: 1px solid #bdb5a8;
+  background: #fff;
+  box-shadow: 0 7px 25px #4e44341c;
+}
+.result-content {
+  padding: 20px 20px 6px;
+}
+.result-sheet-actions { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; color: #176b35; background: #eef9f1; border-bottom: 1px solid #b9dec5; font-weight: 700; }
+.result-sheet-actions button { min-height: 34px; border: 1px solid #176b35; color: #176b35; background: #fff; }
+.marksheet-header { position: relative; display: flex; justify-content: center; gap: 14px; padding: 24px 24px 19px; text-align: center; border-bottom: 3px double var(--site-primary); }
+.marksheet-seal { display: grid; flex: 0 0 62px; width: 62px; height: 62px; place-items: center; border: 2px solid var(--site-primary); border-radius: 50%; color: var(--site-primary); }
+.marksheet-header h2 { margin: 0; color: var(--site-primary); font-size: 25px; line-height: 1.25; }
+.marksheet-header p { margin: 1px 0; color: #5f584e; font-size: 12px; }
+.marksheet-header h3 { display: inline-block; margin: 10px 0 3px; padding: 3px 14px; color: #fff; background: var(--site-primary); font-size: 15px; }
+.marksheet-header strong { display: block; color: #332e27; font-size: 14px; }
+.student-result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding: 17px 22px; border-bottom: 1px solid #d8d2c8; }
+.student-result-grid dl { margin: 0; }
+.student-result-grid dl div { display: grid; grid-template-columns: 125px 1fr; padding: 4px 0; }
+.student-result-grid dt { color: #6e665b; }
+.student-result-grid dd { margin: 0; font-weight: 700; }
+.result-summary-row { display: grid; grid-template-columns: repeat(6, 1fr); border-bottom: 1px solid #cbc4b8; background: #f8f6f1; }
+.result-summary-row div { padding: 11px 7px; border-right: 1px solid #ddd6ca; text-align: center; }
+.result-summary-row div:last-child { border-right: 0; }
+.result-summary-row span { display: block; color: #6f675c; font-size: 11px; }
+.result-summary-row strong { display: block; margin-top: 2px; font-size: 17px; }
+.result-summary-row .pass { color: #16713a; }
+.result-summary-row .fail { color: #b3261e; }
+.result-table-wrap { overflow-x: auto; padding: 18px 20px 9px; }
+.result-marks-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.result-marks-table,
+.marksheet-header,
+.student-result-grid,
+.result-summary-row,
+.result-remarks,
+.marksheet-footer { font-family: var(--site-font); }
+.result-marks-table th { padding: 9px 7px; color: #fff; background: #484137; border: 1px solid #39332c; font-weight: 600; }
+.result-marks-table td { padding: 9px 7px; border: 1px solid #d4cec3; text-align: center; }
+.result-marks-table td:nth-child(2) { min-width: 150px; text-align: left; }
+.result-marks-table td small { display: block; color: #81786c; font-size: 10px; }
+.result-marks-table tbody tr:nth-child(even) { background: #faf9f6; }
+.result-marks-table .failed-row { background: #fff3f2; }
+.subject-pass,
+.subject-fail { display: inline-block; min-width: 40px; padding: 2px 5px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.subject-pass { color: #176b35; background: #e7f5eb; }
+.subject-fail { color: #a8251f; background: #fde9e8; }
+.result-remarks { margin: 4px 20px 15px; padding: 9px 11px; border-left: 3px solid var(--site-secondary); background: #f8f6f1; }
+.marksheet-footer { display: flex; justify-content: space-between; gap: 14px; padding: 12px 20px; border-top: 1px solid #d9d3c8; color: #71695d; font-size: 11px; }
+.marksheet-footer span { display: inline-flex; align-items: center; gap: 5px; }
+.result-footer { font-family: var(--site-font); }
+
+@media (max-width: 760px) {
+  .result-publication { padding: 0; }
+  .result-search-form { grid-template-columns: 1fr; padding: 16px; }
+  .result-search-form .result-identifier-field { grid-column: 1; }
+  .result-form-actions { grid-column: 1; }
+  .student-result-grid { grid-template-columns: 1fr; gap: 0; padding: 13px; }
+  .student-result-grid dl div { grid-template-columns: 110px 1fr; }
+  .result-summary-row { grid-template-columns: repeat(3, 1fr); }
+  .marksheet-header { padding: 18px 12px 14px; }
+  .marksheet-seal { display: none; }
+  .marksheet-header h2 { font-size: 21px; }
+  .marksheet-footer { flex-direction: column; }
+  .result-content { padding: 15px; }
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  html,
+  body {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .no-print, .school-hero, .school-nav, .result-footer { display: none !important; }
+  .school-site,
+  .school-shell,
+  .result-publication {
+    width: 210mm;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+  .result-content { display: block; width: 210mm; padding: 0; }
+  .result-content .main-column { width: 100%; }
+  .result-sheet {
+    box-sizing: border-box;
+    width: 196mm;
+    max-width: none;
+    margin: 7mm;
+    border: 0.35mm solid #777;
+    box-shadow: none;
+  }
+  .marksheet-header {
+    padding: 7mm 8mm 5mm;
+    break-inside: avoid;
+  }
+  .marksheet-header h2 { font-size: 22px; }
+  .marksheet-header h3 {
+    border: 1px solid var(--site-primary);
+    color: #fff !important;
+    background: var(--site-primary) !important;
+  }
+  .marksheet-seal {
+    width: 15mm;
+    height: 15mm;
+    flex-basis: 15mm;
+  }
+  .student-result-grid {
+    gap: 12mm;
+    padding: 5mm 7mm;
+    font-size: 12.5px;
+    break-inside: avoid;
+  }
+  .student-result-grid dl div {
+    grid-template-columns: 31mm 1fr;
+    padding: 1mm 0;
+  }
+  .result-summary-row { break-inside: avoid; }
+  .result-summary-row div { padding: 3mm 1.5mm; }
+  .result-summary-row span { font-size: 10px; }
+  .result-summary-row strong { font-size: 16px; }
+  .result-table-wrap {
+    padding: 5mm 6mm 2.5mm;
+    overflow: visible;
+  }
+  .result-marks-table {
+    table-layout: fixed;
+    font-size: 11px;
+  }
+  .result-marks-table thead { display: table-header-group; }
+  .result-marks-table tr { break-inside: avoid; }
+  .result-marks-table th,
+  .result-marks-table td { padding: 2.2mm 1.2mm; }
+  .result-marks-table th {
+    color: #fff !important;
+    background: #484137 !important;
+  }
+  .result-marks-table th:nth-child(1) { width: 8%; }
+  .result-marks-table th:nth-child(2) { width: 32%; }
+  .result-marks-table th:nth-child(3) { width: 11%; }
+  .result-marks-table th:nth-child(4) { width: 8%; }
+  .result-marks-table th:nth-child(5) { width: 14%; }
+  .result-marks-table th:nth-child(6) { width: 8%; }
+  .result-marks-table th:nth-child(7) { width: 7%; }
+  .result-marks-table th:nth-child(8) { width: 12%; }
+  .result-remarks {
+    margin: 1mm 6mm 4mm;
+    padding: 3mm;
+    break-inside: avoid;
+  }
+  .marksheet-footer {
+    padding: 3mm 6mm;
+    break-inside: avoid;
+  }
+}

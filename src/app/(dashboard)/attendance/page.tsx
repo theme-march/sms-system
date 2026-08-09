@@ -14,6 +14,7 @@ type ClassGroupOption = { id: string; academicYearId: string; classId: string; g
 type ClassSubjectOption = { id: string; academicYearId: string | null; classId: string; groupId: string | null; subjectId: string; subjectName: string; subjectCode: string };
 type RosterRow = { studentId: string; name: string; studentCode: string; rollNumber: number | null; status: AttendanceStatus; remarks: string };
 type RecentRow = { id: string; date: string; studentName: string; rollNumber: number | null; className: string; sectionName: string; status: AttendanceStatus; remarks: string | null };
+type AttendanceScope = { academicYearId: string; classId: string; sectionId: string; groupId: string | null; subjectId: string; isClassTeacher: boolean };
 
 const todayInDhaka = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' });
 const statusStyles: Record<AttendanceStatus, string> = {
@@ -26,6 +27,7 @@ export default function AttendancePage() {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [classGroups, setClassGroups] = useState<ClassGroupOption[]>([]);
   const [classSubjects, setClassSubjects] = useState<ClassSubjectOption[]>([]);
+  const [attendanceScope, setAttendanceScope] = useState<AttendanceScope[] | null>(null);
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
@@ -47,8 +49,11 @@ export default function AttendancePage() {
   const availableGroups = useMemo(() => classGroups.filter((item) => item.classId === classId && item.academicYearId === academicYearId), [academicYearId, classGroups, classId]);
   const availableSubjects = useMemo(() => {
     const seen = new Set<string>();
-    return classSubjects.filter((item) => item.classId === classId && (!item.academicYearId || item.academicYearId === academicYearId) && (!item.groupId || item.groupId === groupId)).filter((item) => !seen.has(item.subjectId) && Boolean(seen.add(item.subjectId)));
-  }, [academicYearId, classId, classSubjects, groupId]);
+    return classSubjects
+      .filter((item) => item.classId === classId && (!item.academicYearId || item.academicYearId === academicYearId) && (!item.groupId || item.groupId === groupId))
+      .filter((item) => !attendanceScope || attendanceScope.some((scope) => scope.academicYearId === academicYearId && scope.classId === classId && scope.sectionId === sectionId && scope.subjectId === item.subjectId && (!groupId || !scope.groupId || scope.groupId === groupId)))
+      .filter((item) => !seen.has(item.subjectId) && Boolean(seen.add(item.subjectId)));
+  }, [academicYearId, attendanceScope, classId, classSubjects, groupId, sectionId]);
   const selectedGroup = availableGroups.find((item) => item.groupId === groupId);
   const selectedSubject = availableSubjects.find((item) => item.subjectId === subjectId);
   const counts = useMemo(() => roster.reduce<Record<AttendanceStatus, number>>((result, row) => {
@@ -73,6 +78,7 @@ export default function AttendancePage() {
       setClasses(payload.classes);
       setClassGroups(payload.classGroups);
       setClassSubjects(payload.classSubjects);
+      setAttendanceScope(payload.attendanceScope ?? null);
       setRoster(payload.roster);
       setRecent(payload.recent);
       setCanManage(payload.canManage);

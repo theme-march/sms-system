@@ -43,6 +43,13 @@ interface SidebarProps {
 
 const icons = {
   Dashboard: LayoutDashboard,
+  "My Dashboard": LayoutDashboard,
+  "My Profile": UserCheck,
+  "My Syllabus": BookOpen,
+  "My Class Routine": Clock,
+  "My Exam Routine": CalendarDays,
+  "My Admit Cards": FileText,
+  "Payment Details": Receipt,
   "School Settings": Settings,
   "Website Settings": Globe,
   "Website Overview": Globe,
@@ -84,6 +91,7 @@ const icons = {
   "Reports & Analytics": BarChart3,
   "System Audit Logs": ClipboardList,
   "My Leave & Salary": CalendarDays,
+  "My Salary & Payslips": DollarSign,
 } as const;
 
 export function Sidebar({
@@ -96,11 +104,90 @@ export function Sidebar({
   currency,
 }: SidebarProps) {
   const pathname = usePathname();
+  const managementRoles = [
+    "Super Admin",
+    "School Admin",
+    "Academic Admin",
+    "Admission Officer",
+    "Accountant",
+    "HR Manager",
+  ];
+  const isTeacherOnly =
+    roles.includes("Teacher") &&
+    !roles.some((role) => managementRoles.includes(role));
+  const teacherPortalItem = NAVIGATION_GROUPS.flatMap(
+    (group) => group.items,
+  ).find((item) => item.label === "Teacher Portal");
+  const isStudentOnly =
+    roles.includes("Student") &&
+    !roles.some((role) => managementRoles.includes(role));
+  const studentPortalItem = NAVIGATION_GROUPS.flatMap(
+    (group) => group.items,
+  ).find((item) => item.label === "Student Portal");
   const navGroups = NAVIGATION_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) =>
-      canAccessPermission(permissions, roles, item.permission),
-    ),
+    items: [
+      ...(isTeacherOnly &&
+      group.title === "Core Management" &&
+      teacherPortalItem
+        ? [{ ...teacherPortalItem, label: "My Dashboard", href: "/teacher" }]
+        : []),
+      ...(isStudentOnly &&
+      group.title === "Core Management" &&
+      studentPortalItem
+        ? [
+            { ...studentPortalItem, label: "My Dashboard", href: "/student" },
+            {
+              ...studentPortalItem,
+              label: "My Profile",
+              href: "/student/profile",
+            },
+            {
+              ...studentPortalItem,
+              label: "My Syllabus",
+              href: "/student/syllabus",
+            },
+            {
+              ...studentPortalItem,
+              label: "My Class Routine",
+              href: "/student/class-routine",
+            },
+            {
+              ...studentPortalItem,
+              label: "My Exam Routine",
+              href: "/student/exam-routine",
+            },
+            {
+              ...studentPortalItem,
+              label: "My Admit Cards",
+              href: "/student/admit-cards",
+            },
+            {
+              ...studentPortalItem,
+              label: "Payment Details",
+              href: "/student/payments",
+            },
+          ]
+        : []),
+      ...group.items
+        .filter((item) =>
+          canAccessPermission(permissions, roles, item.permission),
+        )
+        .filter(
+          (item) =>
+            !(
+              isTeacherOnly &&
+              ["Dashboard", "Teacher Portal"].includes(item.label)
+            ),
+        )
+        .filter(
+          (item) =>
+            !(
+              isStudentOnly &&
+              ["Dashboard", "Student Portal"].includes(item.label)
+            ),
+        ),
+    ],
   })).filter((group) => group.items.length > 0);
 
   const sidebarContent = (

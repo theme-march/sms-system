@@ -7,6 +7,73 @@ import {
 } from "@/src/lib/auth/authorize";
 import { PERMISSIONS } from "@/src/config/permissions";
 import { createAuditLog } from "@/src/lib/audit";
+import { calculateOverallResult } from "@/src/lib/exam-calculations";
+
+const MANAGEMENT_ROLES = [
+  "Super Admin",
+  "School Admin",
+  "Academic Admin",
+  "Admission Officer",
+  "Accountant",
+  "HR Manager",
+];
+
+type AuthorizedSession = Awaited<ReturnType<typeof requirePermission>>;
+
+function isTeacherOnly(session: AuthorizedSession) {
+  return (
+    session.roles.includes("Teacher") &&
+    !session.roles.some((role) => MANAGEMENT_ROLES.includes(role))
+  );
+}
+
+async function getTeacherMarksAssignments(session: AuthorizedSession) {
+  if (!isTeacherOnly(session)) return null;
+  return prisma.teacherAssignment.findMany({
+    where: {
+      schoolId: session.schoolId,
+      status: "ACTIVE",
+      teacher: { userId: session.id, status: "ACTIVE" },
+    },
+    select: {
+      classId: true,
+      sectionId: true,
+      subjectId: true,
+      academicYear: { select: { name: true, startDate: true, endDate: true } },
+    },
+  });
+}
+
+function assignmentMatchesExam(
+  assignment: NonNullable<Awaited<ReturnType<typeof getTeacherMarksAssignments>>>[number],
+  exam: { year: number; startDate: Date; endDate: Date },
+) {
+  return (
+    assignment.academicYear.name.includes(String(exam.year)) ||
+    (assignment.academicYear.startDate <= exam.startDate &&
+      assignment.academicYear.endDate >= exam.endDate)
+  );
+}
+
+async function canAccessTeacherMarksSheet(
+  session: AuthorizedSession,
+  ids: { examId: string; classId: string; sectionId: string; subjectId: string },
+) {
+  const assignments = await getTeacherMarksAssignments(session);
+  if (!assignments) return true;
+  const exam = await prisma.exam.findFirst({
+    where: { id: ids.examId, schoolId: session.schoolId },
+    select: { year: true, startDate: true, endDate: true },
+  });
+  if (!exam) return false;
+  return assignments.some(
+    (assignment) =>
+      assignment.classId === ids.classId &&
+      assignment.sectionId === ids.sectionId &&
+      assignment.subjectId === ids.subjectId &&
+      assignmentMatchesExam(assignment, exam),
+  );
+}
 
 const examSchema = z.object({
   name: z.string().trim().min(3).max(191),
@@ -16,6 +83,16 @@ const examSchema = z.object({
   endDate: z.string().date(),
   classId: z.string().trim().min(1),
   sectionId: z.string().trim().optional().or(z.literal("")),
+  assignments: z
+    .array(
+      z.object({
+        classId: z.string().trim().min(1),
+        sectionId: z.string().trim().optional().or(z.literal("")),
+      }),
+    )
+    .min(1)
+    .max(100)
+    .optional(),
 });
 
 const routineSchema = z.object({
@@ -131,6 +208,7 @@ async function owns(
 export async function GET(request: NextRequest) {
   try {
     const session = await requirePermission(PERMISSIONS.EXAMS_VIEW);
+    const teacherMarksAssignments = await getTeacherMarksAssignments(session);
     const examId = request.nextUrl.searchParams.get("examId") || "";
     const classId = request.nextUrl.searchParams.get("classId") || "";
     const sectionId = request.nextUrl.searchParams.get("sectionId") || "";
@@ -318,6 +396,42 @@ export async function GET(request: NextRequest) {
     });
     const studentMap = new Map(students.map((item) => [item.id, item]));
     const selectedExam = examId ? examMap.get(examId) : undefined;
+    const marksScope = teacherMarksAssignments
+      ? exams.flatMap((exam) =>
+          teacherMarksAssignments
+            .filter((assignment) => assignmentMatchesExam(assignment, exam))
+            .map((assignment) => ({
+              examId: exam.id,
+              classId: assignment.classId,
+              sectionId: assignment.sectionId,
+              subjectId: assignment.subjectId,
+            })),
+        )
+      : null;
+    const requestedMarksSheetAllowed =
+      !marksScope ||
+      !examId ||
+      !classId ||
+      !sectionId ||
+      !subjectId ||
+      marksScope.some(
+        (scope) =>
+          scope.examId === examId &&
+          scope.classId === classId &&
+          scope.sectionId === sectionId &&
+          scope.subjectId === subjectId,
+      );
+    const visibleMarks = marksScope
+      ? marks.filter((mark) =>
+          marksScope.some(
+            (scope) =>
+              scope.examId === mark.examId &&
+              scope.classId === mark.student.classId &&
+              scope.sectionId === mark.student.sectionId &&
+              scope.subjectId === mark.subjectId,
+          ),
+        )
+      : marks;
     let roster: Array<{
       studentId: string;
       name: string;
@@ -327,7 +441,13 @@ export async function GET(request: NextRequest) {
       comments: string;
       locked: boolean;
     }> = [];
-    if (selectedExam && classId && sectionId && subjectId) {
+    if (
+      requestedMarksSheetAllowed &&
+      selectedExam &&
+      classId &&
+      sectionId &&
+      subjectId
+    ) {
       const year =
         years.find((item) => item.name.includes(String(selectedExam.year))) ||
         years.find((item) => item.isCurrent);
@@ -343,7 +463,7 @@ export async function GET(request: NextRequest) {
         orderBy: { rollNumber: "asc" },
       });
       const existing = new Map(
-        marks
+        visibleMarks
           .filter(
             (item) => item.examId === examId && item.subjectId === subjectId,
           )
@@ -403,25 +523,8 @@ export async function GET(request: NextRequest) {
     }
     const effectiveExamSubjects = [...examSubjects];
     for (const link of effectiveExamClasses) {
-      const observedSubjectIds = new Set([
-        ...marks
-          .filter(
-            (item) =>
-              item.examId === link.examId &&
-              item.student.classId === link.classId,
-          )
-          .map((item) => item.subjectId),
-        ...routines
-          .filter(
-            (item) =>
-              item.examId === link.examId && item.classId === link.classId,
-          )
-          .map((item) => item.subjectId),
-      ]);
       const mappings = classSubjectMappings.filter(
-        (item) =>
-          item.classId === link.classId &&
-          (!observedSubjectIds.size || observedSubjectIds.has(item.subjectId)),
+        (item) => item.classId === link.classId,
       );
       for (const mapping of mappings) {
         if (
@@ -476,6 +579,7 @@ export async function GET(request: NextRequest) {
           session.roles.includes("Super Admin") ||
           session.permissions.includes(PERMISSIONS.RESULTS_PUBLISH),
       },
+      marksScope,
       years: years.map((item) => ({
         ...item,
         startDate: dateOnly(item.startDate),
@@ -513,7 +617,7 @@ export async function GET(request: NextRequest) {
           : "All sections",
         subjectName: subjectMap.get(item.subjectId)?.nameEn || "—",
       })),
-      marks: marks.map((item) => ({
+      marks: visibleMarks.map((item) => ({
         id: item.id,
         examId: item.examId,
         examName: examMap.get(item.examId)?.name || "—",
@@ -556,16 +660,29 @@ export async function POST(request: NextRequest) {
     if (action === "createExam") {
       const session = await requirePermission(PERMISSIONS.EXAMS_MANAGE);
       const parsed = examSchema.parse(body);
+      const assignments = parsed.assignments?.length
+        ? parsed.assignments
+        : [{ classId: parsed.classId, sectionId: parsed.sectionId }];
+      const uniqueAssignments = assignments.filter(
+        (item, index, rows) =>
+          rows.findIndex(
+            (row) =>
+              row.classId === item.classId &&
+              (row.sectionId || "") === (item.sectionId || ""),
+          ) === index,
+      );
       if (parsed.endDate < parsed.startDate)
         return NextResponse.json(
           { error: "End date cannot be before start date." },
           { status: 400 },
         );
-      if (
-        !(await owns(session.schoolId, "class", parsed.classId)) ||
-        (parsed.sectionId &&
-          !(await owns(session.schoolId, "section", parsed.sectionId)))
-      )
+      const assignmentValidity = await Promise.all(
+        uniqueAssignments.flatMap((item) => [
+          owns(session.schoolId, "class", item.classId),
+          owns(session.schoolId, "section", item.sectionId || ""),
+        ]),
+      );
+      if (assignmentValidity.some((item) => !item))
         return NextResponse.json(
           { error: "Invalid class or section." },
           { status: 400 },
@@ -582,7 +699,7 @@ export async function POST(request: NextRequest) {
       const classSubjects = await prisma.classSubject.findMany({
         where: {
           schoolId: session.schoolId,
-          classId: parsed.classId,
+          classId: { in: uniqueAssignments.map((item) => item.classId) },
           status: "ACTIVE",
           deletedAt: null,
           AND: [
@@ -590,6 +707,7 @@ export async function POST(request: NextRequest) {
           ],
         },
         select: {
+          classId: true,
           subjectId: true,
           fullMarks: true,
           passMarks: true,
@@ -604,6 +722,20 @@ export async function POST(request: NextRequest) {
           },
           { status: 409 },
         );
+      const missingClassIds = uniqueAssignments
+        .map((item) => item.classId)
+        .filter(
+          (classId) =>
+            !classSubjects.some((subject) => subject.classId === classId),
+        );
+      if (missingClassIds.length)
+        return NextResponse.json(
+          {
+            error:
+              "One or more selected classes have no Class–Subject mapping.",
+          },
+          { status: 409 },
+        );
       const exam = await prisma.$transaction(async (tx) => {
         const created = await tx.exam.create({
           data: {
@@ -615,17 +747,17 @@ export async function POST(request: NextRequest) {
             endDate: new Date(`${parsed.endDate}T00:00:00.000Z`),
           },
         });
-        await tx.examClass.create({
-          data: {
+        await tx.examClass.createMany({
+          data: uniqueAssignments.map((item) => ({
             examId: created.id,
-            classId: parsed.classId,
-            sectionId: parsed.sectionId || null,
-          },
+            classId: item.classId,
+            sectionId: item.sectionId || null,
+          })),
         });
         await tx.examSubject.createMany({
           data: classSubjects.map((item) => ({
             examId: created.id,
-            classId: parsed.classId,
+            classId: item.classId,
             subjectId: item.subjectId,
             fullMarks: item.fullMarks,
             passMarks: item.passMarks,
@@ -642,7 +774,7 @@ export async function POST(request: NextRequest) {
         action: "CREATE",
         module: "Examinations",
         recordId: exam.id,
-        details: `Created ${exam.name} with ${classSubjects.length} subjects`,
+        details: `Created ${exam.name} for ${uniqueAssignments.length} class/section assignment(s) with ${classSubjects.length} subjects`,
       });
       return NextResponse.json(exam, { status: 201 });
     }
@@ -659,15 +791,105 @@ export async function POST(request: NextRequest) {
           { error: "End date cannot be before start date." },
           { status: 400 },
         );
-      await prisma.exam.update({
-        where: { id: parsed.id },
-        data: {
-          name: parsed.name,
-          term: parsed.term,
-          year: parsed.year,
-          startDate: new Date(`${parsed.startDate}T00:00:00.000Z`),
-          endDate: new Date(`${parsed.endDate}T00:00:00.000Z`),
+      const requestedAssignments = parsed.assignments?.length
+        ? parsed.assignments
+        : [{ classId: parsed.classId, sectionId: parsed.sectionId }];
+      const existingAssignments = await prisma.examClass.findMany({
+        where: { examId: parsed.id },
+      });
+      const additions = requestedAssignments.filter(
+        (item) =>
+          !existingAssignments.some(
+            (existing) =>
+              existing.classId === item.classId &&
+              (existing.sectionId || "") === (item.sectionId || ""),
+          ),
+      );
+      const additionValidity = await Promise.all(
+        additions.flatMap((item) => [
+          owns(session.schoolId, "class", item.classId),
+          owns(session.schoolId, "section", item.sectionId || ""),
+        ]),
+      );
+      if (additionValidity.some((item) => !item))
+        return NextResponse.json(
+          { error: "Invalid class or section." },
+          { status: 400 },
+        );
+      const year = await prisma.academicYear.findFirst({
+        where: {
+          schoolId: session.schoolId,
+          name: { contains: String(parsed.year) },
+          status: "ACTIVE",
+          deletedAt: null,
         },
+        select: { id: true },
+      });
+      const existingClassIds = new Set(
+        existingAssignments.map((item) => item.classId),
+      );
+      const additionClassIds = [
+        ...new Set(
+          additions
+            .map((item) => item.classId)
+            .filter((classId) => !existingClassIds.has(classId)),
+        ),
+      ];
+      const additionSubjects = additionClassIds.length
+        ? await prisma.classSubject.findMany({
+            where: {
+              schoolId: session.schoolId,
+              classId: { in: additionClassIds },
+              status: "ACTIVE",
+              deletedAt: null,
+              AND: [
+                { OR: [{ academicYearId: year?.id }, { academicYearId: null }] },
+              ],
+            },
+          })
+        : [];
+      if (
+        additionClassIds.some(
+          (classId) =>
+            !additionSubjects.some((subject) => subject.classId === classId),
+        )
+      )
+        return NextResponse.json(
+          { error: "A selected class has no Class–Subject mapping." },
+          { status: 409 },
+        );
+      await prisma.$transaction(async (tx) => {
+        await tx.exam.update({
+          where: { id: parsed.id },
+          data: {
+            name: parsed.name,
+            term: parsed.term,
+            year: parsed.year,
+            startDate: new Date(`${parsed.startDate}T00:00:00.000Z`),
+            endDate: new Date(`${parsed.endDate}T00:00:00.000Z`),
+          },
+        });
+        if (additions.length)
+          await tx.examClass.createMany({
+            data: additions.map((item) => ({
+              examId: parsed.id,
+              classId: item.classId,
+              sectionId: item.sectionId || null,
+            })),
+          });
+        if (additionSubjects.length)
+          await tx.examSubject.createMany({
+            data: additionSubjects.map((item) => ({
+              examId: parsed.id,
+              classId: item.classId,
+              subjectId: item.subjectId,
+              fullMarks: item.fullMarks,
+              passMarks: item.passMarks,
+              isOptional:
+                item.subjectType === "optional" ||
+                item.subjectType === "additional",
+            })),
+          });
       });
       await createAuditLog({
         schoolId: session.schoolId,
@@ -694,6 +916,40 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: "One or more schedule options are invalid." },
           { status: 400 },
+        );
+      const [examRow, assignedClass, configuredSubject] = await Promise.all([
+        prisma.exam.findFirst({
+          where: { id: parsed.examId, schoolId: session.schoolId },
+        }),
+        prisma.examClass.count({
+          where: {
+            examId: parsed.examId,
+            classId: parsed.classId,
+            OR: [{ sectionId: null }, { sectionId: parsed.sectionId || null }],
+          },
+        }),
+        prisma.examSubject.count({
+          where: {
+            examId: parsed.examId,
+            classId: parsed.classId,
+            subjectId: parsed.subjectId,
+          },
+        }),
+      ]);
+      if (!assignedClass || !configuredSubject)
+        return NextResponse.json(
+          { error: "This class/subject is not assigned to the selected exam." },
+          { status: 409 },
+        );
+      const examDate = new Date(`${parsed.examDate}T00:00:00.000Z`);
+      if (
+        !examRow ||
+        examDate < examRow.startDate ||
+        examDate > examRow.endDate
+      )
+        return NextResponse.json(
+          { error: "Exam date must be inside the examination date range." },
+          { status: 409 },
         );
       if (
         parsed.startTime >= parsed.endTime ||
@@ -782,6 +1038,11 @@ export async function POST(request: NextRequest) {
     if (action === "saveMarks") {
       const session = await requirePermission(PERMISSIONS.MARKS_ENTER);
       const parsed = marksSchema.parse(body);
+      if (!(await canAccessTeacherMarksSheet(session, parsed)))
+        return NextResponse.json(
+          { error: "You can enter marks only for your assigned class, section and subject." },
+          { status: 403 },
+        );
       if (
         !(await owns(session.schoolId, "exam", parsed.examId)) ||
         !(await owns(session.schoolId, "subject", parsed.subjectId))
@@ -923,18 +1184,43 @@ export async function POST(request: NextRequest) {
         .object({
           examId: z.string().min(1),
           classId: z.string().min(1),
+          sectionId: z.string().min(1),
           subjectId: z.string().min(1),
           remarks: z.string().max(500).optional(),
         })
         .parse(body);
+      if (!(await canAccessTeacherMarksSheet(session, ids)))
+        return NextResponse.json(
+          { error: "You can verify marks only for your assigned class, section and subject." },
+          { status: 403 },
+        );
       if (!(await owns(session.schoolId, "exam", ids.examId)))
         return NextResponse.json({ error: "Invalid exam." }, { status: 400 });
       const studentIds = (
         await prisma.student.findMany({
-          where: { schoolId: session.schoolId, classId: ids.classId },
+          where: {
+            schoolId: session.schoolId,
+            classId: ids.classId,
+            sectionId: ids.sectionId,
+          },
           select: { id: true },
         })
       ).map((item) => item.id);
+      const savedMarkCount = await prisma.mark.count({
+        where: {
+          examId: ids.examId,
+          subjectId: ids.subjectId,
+          studentId: { in: studentIds },
+        },
+      });
+      if (!studentIds.length || savedMarkCount !== studentIds.length)
+        return NextResponse.json(
+          {
+            error:
+              "Save marks or mark absent for every student before verification.",
+          },
+          { status: 409 },
+        );
       await prisma.$transaction(async (tx) => {
         await tx.mark.updateMany({
           where: {
@@ -980,6 +1266,7 @@ export async function POST(request: NextRequest) {
         .object({
           examId: z.string().min(1),
           classId: z.string().min(1),
+          sectionId: z.string().min(1),
           subjectId: z.string().min(1),
           reason: z.string().trim().min(3).max(500),
         })
@@ -988,7 +1275,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid exam." }, { status: 400 });
       const studentIds = (
         await prisma.student.findMany({
-          where: { schoolId: session.schoolId, classId: ids.classId },
+          where: {
+            schoolId: session.schoolId,
+            classId: ids.classId,
+            sectionId: ids.sectionId,
+          },
           select: { id: true },
         })
       ).map((item) => item.id);
@@ -1052,34 +1343,21 @@ export async function POST(request: NextRequest) {
       let configs = await prisma.examSubject.findMany({
         where: { examId: ids.examId, classId: ids.classId },
       });
-      if (!configs.length) {
-        const observedSubjectIds = [
-          ...new Set(
-            (
-              await prisma.mark.findMany({
-                where: {
-                  examId: ids.examId,
-                  studentId: { in: enrollments.map((item) => item.studentId) },
-                },
-                select: { subjectId: true },
-              })
-            ).map((item) => item.subjectId),
-          ),
-        ];
-        const mappings = await prisma.classSubject.findMany({
-          where: {
-            schoolId: session.schoolId,
-            classId: ids.classId,
-            status: "ACTIVE",
-            deletedAt: null,
-            ...(observedSubjectIds.length
-              ? { subjectId: { in: observedSubjectIds } }
-              : {}),
-          },
-        });
-        if (mappings.length) {
-          await prisma.examSubject.createMany({
-            data: mappings.map((mapping) => ({
+      const mappings = await prisma.classSubject.findMany({
+        where: {
+          schoolId: session.schoolId,
+          classId: ids.classId,
+          status: "ACTIVE",
+          deletedAt: null,
+        },
+      });
+      const configuredSubjectIds = new Set(configs.map((item) => item.subjectId));
+      const missingMappings = mappings.filter(
+        (mapping) => !configuredSubjectIds.has(mapping.subjectId),
+      );
+      if (missingMappings.length) {
+        await prisma.examSubject.createMany({
+            data: missingMappings.map((mapping) => ({
               examId: ids.examId,
               classId: ids.classId,
               subjectId: mapping.subjectId,
@@ -1089,11 +1367,10 @@ export async function POST(request: NextRequest) {
                 mapping.subjectType === "optional" ||
                 mapping.subjectType === "additional",
             })),
-          });
-          configs = await prisma.examSubject.findMany({
-            where: { examId: ids.examId, classId: ids.classId },
-          });
-        }
+        });
+        configs = await prisma.examSubject.findMany({
+          where: { examId: ids.examId, classId: ids.classId },
+        });
       }
       const allMarks = await prisma.mark.findMany({
         where: {
@@ -1106,43 +1383,72 @@ export async function POST(request: NextRequest) {
           { error: "No enrolled students or configured subjects were found." },
           { status: 409 },
         );
+      const calculatedSubjectIds = new Set(
+        configs.map((item) => item.subjectId),
+      );
+      const relevantMarks = allMarks.filter((item) =>
+        calculatedSubjectIds.has(item.subjectId),
+      );
+      const expectedMarkCount = enrollments.length * configs.length;
+      if (relevantMarks.length < expectedMarkCount)
+        return NextResponse.json(
+          {
+            error: `Marks are incomplete. Save marks or mark absent for every student in all ${configs.length} subjects before calculating.`,
+          },
+          { status: 409 },
+        );
+      if (relevantMarks.some((item) => !item.isLocked))
+        return NextResponse.json(
+          {
+            error:
+              "Verify & lock every subject marks sheet before calculating results.",
+          },
+          { status: 409 },
+        );
       const calculated = enrollments
         .map((enrollment) => {
-          const rows = configs.map((config) => {
-            const mark = allMarks.find(
-              (item) =>
-                item.studentId === enrollment.studentId &&
-                item.subjectId === config.subjectId,
-            );
-            const obtained = mark ? Number(mark.marksObtained) : 0;
-            const absent = mark?.comments === "ABSENT" || !mark;
-            const passed = !absent && obtained >= Number(config.passMarks);
-            const g = grade((obtained / Number(config.fullMarks)) * 100);
-            return { config, obtained, absent, passed, grade: g };
-          });
-          const total = rows.reduce((sum, item) => sum + item.obtained, 0);
-          const full = rows.reduce(
-            (sum, item) => sum + Number(item.config.fullMarks),
-            0,
+          const overall = calculateOverallResult(
+            configs.map((config) => {
+              const mark = relevantMarks.find(
+                (item) =>
+                  item.studentId === enrollment.studentId &&
+                  item.subjectId === config.subjectId,
+              );
+              return {
+                subjectId: config.subjectId,
+                isOptional: config.isOptional,
+                fullMarks: Number(config.fullMarks),
+                passMarks: Number(config.passMarks),
+                written: mark ? Number(mark.marksObtained) : 0,
+                isAbsent: mark?.comments === "ABSENT" || !mark,
+              };
+            }),
           );
-          const failed = rows.filter(
-            (item) => !item.passed && !item.config.isOptional,
-          ).length;
-          const percentage = full ? (total / full) * 100 : 0;
-          const avgGpa = rows.length
-            ? rows.reduce((sum, item) => sum + item.grade.point, 0) /
-              rows.length
-            : 0;
+          const rows = overall.subjectResults.map((subjectResult) => {
+            const config = configs.find(
+              (item) => item.subjectId === subjectResult.subjectId,
+            )!;
+            return {
+              config,
+              obtained: subjectResult.obtainedMarks,
+              absent: subjectResult.isAbsent,
+              passed: subjectResult.isPassed,
+              grade: {
+                letter: subjectResult.letterGrade,
+                point: subjectResult.gradePoint,
+              },
+            };
+          });
           return {
             studentId: enrollment.studentId,
             rows,
-            total,
-            average: rows.length ? total / rows.length : 0,
-            percentage,
-            gpa: failed ? 0 : Math.min(5, avgGpa),
-            letter: failed ? "F" : grade(percentage).letter,
-            failed,
-            passed: failed === 0,
+            total: overall.totalMarks,
+            average: overall.average,
+            percentage: overall.percentage,
+            gpa: overall.gpa,
+            letter: overall.letterGrade,
+            failed: overall.failedSubjectCount,
+            passed: overall.isPassed,
           };
         })
         .sort(
@@ -1242,11 +1548,21 @@ export async function POST(request: NextRequest) {
         .parse(body);
       if (!(await owns(session.schoolId, "exam", ids.examId)))
         return NextResponse.json({ error: "Invalid exam." }, { status: 400 });
-      await prisma.$transaction(async (tx) => {
-        await tx.exam.update({
-          where: { id: ids.examId },
-          data: { isPublished: ids.publish },
+      if (ids.publish) {
+        const resultCount = await prisma.studentResult.count({
+          where: {
+            schoolId: session.schoolId,
+            examId: ids.examId,
+            ...(ids.classId ? { classId: ids.classId } : {}),
+          },
         });
+        if (!resultCount)
+          return NextResponse.json(
+            { error: "Calculate this class result before publishing." },
+            { status: 409 },
+          );
+      }
+      await prisma.$transaction(async (tx) => {
         const existing = await tx.resultPublication.findFirst({
           where: {
             schoolId: session.schoolId,
@@ -1284,6 +1600,17 @@ export async function POST(request: NextRequest) {
               ...data,
             },
           });
+        const activePublications = await tx.resultPublication.count({
+          where: {
+            schoolId: session.schoolId,
+            examId: ids.examId,
+            status: "PUBLISHED",
+          },
+        });
+        await tx.exam.update({
+          where: { id: ids.examId },
+          data: { isPublished: activePublications > 0 },
+        });
       });
       await createAuditLog({
         schoolId: session.schoolId,

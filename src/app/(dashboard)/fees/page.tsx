@@ -1,86 +1,1213 @@
-'use client';
+"use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { Banknote, CircleDollarSign, CreditCard, Edit2, FilePlus2, Plus, Printer, Receipt, Search, Settings2, Trash2, WalletCards, X } from 'lucide-react';
-import { PageHeader } from '@/src/components/ui/PageHeader';
-import { DatabaseEmptyState } from '@/src/components/ui/DatabaseEmptyState';
-import { formatCurrency } from '@/src/lib/utils';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Banknote,
+  CircleDollarSign,
+  CreditCard,
+  Edit2,
+  FilePlus2,
+  Plus,
+  Printer,
+  Receipt,
+  Search,
+  Settings2,
+  Trash2,
+  WalletCards,
+  X,
+} from "lucide-react";
+import { PageHeader } from "@/src/components/ui/PageHeader";
+import { DatabaseEmptyState } from "@/src/components/ui/DatabaseEmptyState";
+import { formatCurrency } from "@/src/lib/utils";
 
-type Tab = 'invoices' | 'structures' | 'collections';
+type Tab = "invoices" | "structures" | "collections";
 type Data = any;
-const emptyData = { canManage: false, structures: [], invoices: [], students: [], payments: [], totals: { invoiced: 0, collected: 0, outstanding: 0, overdue: 0 } };
-const today = new Date().toLocaleDateString('en-CA');
+const emptyData = {
+  canManage: false,
+  structures: [],
+  invoices: [],
+  students: [],
+  payments: [],
+  totals: { invoiced: 0, collected: 0, outstanding: 0, overdue: 0 },
+};
+const today = new Date().toLocaleDateString("en-CA");
 
 export default function FeesPage() {
   const [data, setData] = useState<Data>(emptyData);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<Tab>('invoices');
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('ALL');
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [modal, setModal] = useState<'structure' | 'invoice' | 'payment' | 'bulk' | null>(null);
+  const [tab, setTab] = useState<Tab>("invoices");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("ALL");
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [modal, setModal] = useState<
+    "structure" | "invoice" | "payment" | "bulk" | null
+  >(null);
   const [selected, setSelected] = useState<any>(null);
-  const [structure, setStructure] = useState({ name: '', amount: '', frequency: 'MONTHLY', description: '' });
-  const [editingStructureId, setEditingStructureId] = useState('');
-  const [customFrequency, setCustomFrequency] = useState('');
-  const [invoice, setInvoice] = useState({ studentId: '', feeStructureId: '', amount: '', discount: '0', dueDate: today });
-  const [payment, setPayment] = useState({ amount: '', paymentMethod: 'CASH', transactionId: '', notes: '' });
-  const [bulk, setBulk] = useState({ category: 'TUITION', title: 'Monthly Tuition Fee', amount: '', frequency: 'MONTHLY', academicYearId: '', classId: '', groupId: '', sectionId: '', examId: '', dueDate: today });
+  const [structure, setStructure] = useState({
+    name: "",
+    category: "TUITION",
+    amount: "",
+    frequency: "MONTHLY",
+    description: "",
+  });
+  const [editingStructureId, setEditingStructureId] = useState("");
+  const [customFrequency, setCustomFrequency] = useState("");
+  const [invoice, setInvoice] = useState({
+    studentId: "",
+    feeStructureId: "",
+    amount: "",
+    discount: "0",
+    dueDate: today,
+  });
+  const [payment, setPayment] = useState({
+    amount: "",
+    paymentMethod: "CASH",
+    transactionId: "",
+    notes: "",
+  });
+  const [bulk, setBulk] = useState({
+    category: "TUITION",
+    feeStructureId: "",
+    academicYearId: "",
+    classId: "",
+    groupId: "",
+    sectionId: "",
+    examId: "",
+    dueDate: today,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const response = await fetch('/api/fees', { cache: 'no-store' }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error); setData(payload); }
-    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Unable to load fees.' }); }
-    finally { setLoading(false); }
+    try {
+      const response = await fetch("/api/fees", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      setData(payload);
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Unable to load fees.",
+      });
+    } finally {
+      setLoading(false);
+    }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const filtered = useMemo(() => data.invoices.filter((item: any) => {
-    const haystack = `${item.invoiceNumber} ${item.student.nameEn} ${item.student.studentCode} ${item.feeStructure.name}`.toLowerCase();
-    return (!search || haystack.includes(search.toLowerCase())) && (status === 'ALL' || item.status === status);
-  }), [data.invoices, search, status]);
-  const frequencyOptions = useMemo(() => Array.from(new Set(['MONTHLY', 'YEARLY', 'ONE_TIME', ...data.structures.map((item: any) => String(item.frequency).toUpperCase())])), [data.structures]);
+  const filtered = useMemo(
+    () =>
+      data.invoices.filter((item: any) => {
+        const haystack =
+          `${item.invoiceNumber} ${item.student.nameEn} ${item.student.studentCode} ${item.feeStructure.name}`.toLowerCase();
+        return (
+          (!search || haystack.includes(search.toLowerCase())) &&
+          (status === "ALL" || item.status === status)
+        );
+      }),
+    [data.invoices, search, status],
+  );
+  const frequencyOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          "MONTHLY",
+          "YEARLY",
+          "ONE_TIME",
+          ...data.structures.map((item: any) =>
+            String(item.frequency).toUpperCase(),
+          ),
+        ]),
+      ),
+    [data.structures],
+  );
 
   async function submit(body: object, success: string) {
-    setBusy(true); setMessage(null);
-    try { const response = await fetch('/api/fees', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error); setMessage({ type: 'success', text: success }); setModal(null); await load(); return true; }
-    catch (error) { setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Operation failed.' }); return false; }
-    finally { setBusy(false); }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/fees", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
+      setMessage({ type: "success", text: success });
+      setModal(null);
+      await load();
+      return true;
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Operation failed.",
+      });
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }
-  function chooseStructure(id: string) { const item = data.structures.find((row: any) => row.id === id); setInvoice({ ...invoice, feeStructureId: id, amount: item ? String(item.amount) : '' }); }
-  function openPayment(item: any) { setSelected(item); setPayment({ amount: String(item.dueAmount), paymentMethod: 'CASH', transactionId: '', notes: '' }); setModal('payment'); }
-  function openNewStructure() { setEditingStructureId(''); setCustomFrequency(''); setStructure({ name: '', amount: '', frequency: 'MONTHLY', description: '' }); setModal('structure'); }
-  function openEditStructure(item: any) { const frequency = String(item.frequency).toUpperCase(); setEditingStructureId(item.id); setCustomFrequency(''); setStructure({ name: item.name, amount: String(item.amount), frequency, description: item.description || '' }); setModal('structure'); }
-  async function deleteStructure(item: any) { if (window.confirm(`Delete fee structure “${item.name}”?`)) await submit({ action: 'deleteStructure', id: item.id }, 'Fee structure deleted.'); }
-  async function cancelInvoice(item: any) { if (window.confirm(`Cancel invoice ${item.invoiceNumber}?`)) await submit({ action: 'cancelInvoice', invoiceId: item.id }, 'Invoice cancelled.'); }
+  function chooseStructure(id: string) {
+    const item = data.structures.find((row: any) => row.id === id);
+    setInvoice({
+      ...invoice,
+      feeStructureId: id,
+      amount: item ? String(item.amount) : "",
+    });
+  }
+  function openPayment(item: any) {
+    setSelected(item);
+    setPayment({
+      amount: String(item.dueAmount),
+      paymentMethod: "CASH",
+      transactionId: "",
+      notes: "",
+    });
+    setModal("payment");
+  }
+  function openNewStructure() {
+    setEditingStructureId("");
+    setCustomFrequency("");
+    setStructure({
+      name: "",
+      category: "TUITION",
+      amount: "",
+      frequency: "MONTHLY",
+      description: "",
+    });
+    setModal("structure");
+  }
+  function openEditStructure(item: any) {
+    const frequency = String(item.frequency).toUpperCase();
+    setEditingStructureId(item.id);
+    setCustomFrequency("");
+    setStructure({
+      name: item.name,
+      category: item.category || "OTHER",
+      amount: String(item.amount),
+      frequency,
+      description: item.description || "",
+    });
+    setModal("structure");
+  }
+  async function deleteStructure(item: any) {
+    if (window.confirm(`Delete fee structure “${item.name}”?`))
+      await submit(
+        { action: "deleteStructure", id: item.id },
+        "Fee structure deleted.",
+      );
+  }
+  async function cancelInvoice(item: any) {
+    if (window.confirm(`Cancel invoice ${item.invoiceNumber}?`))
+      await submit(
+        { action: "cancelInvoice", invoiceId: item.id },
+        "Invoice cancelled.",
+      );
+  }
 
-  return <div className="space-y-5 pb-10">
-    <PageHeader title="Fees & Invoices" subtitle="Organize fee structures, targeted student billing, collections and receipts" breadcrumbs={[{ label: 'Fees' }]} action={data.canManage ? <div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => window.print()}><Printer className="h-4 w-4" />Print</button><button className="btn-secondary" onClick={openNewStructure}><Plus className="h-4 w-4" />Fee Structure</button><button className="btn-secondary" onClick={() => { const year = data.academicYears?.[0]?.id || ''; setBulk({...bulk, academicYearId: year}); setModal('bulk'); }}><WalletCards className="h-4 w-4" />Targeted Billing</button><button className="btn-primary" onClick={() => setModal('invoice')}><FilePlus2 className="h-4 w-4" />Single Invoice</button></div> : undefined} />
-    {message && <div className={`rounded-xl border px-4 py-3 text-sm font-semibold ${message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{message.text}</div>}
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Summary icon={Receipt} label="Total invoiced" value={data.totals.invoiced} tone="teal" /><Summary icon={Banknote} label="Collected" value={data.totals.collected} tone="emerald" /><Summary icon={WalletCards} label="Outstanding" value={data.totals.outstanding} tone="amber" /><Summary icon={CircleDollarSign} label="Overdue" value={data.totals.overdue} tone="rose" /></div>
-    <nav className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm print:hidden">{([['invoices', Receipt, 'Invoice Ledger'], ['structures', Settings2, 'Fee Structures'], ['collections', CreditCard, 'Collections']] as const).map(([key, Icon, label]) => <button key={key} onClick={() => setTab(key)} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition ${tab === key ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'}`}><Icon className="h-4 w-4" />{label}</button>)}</nav>
+  return (
+    <div className="space-y-5 pb-10">
+      <PageHeader
+        title="Fees & Invoices"
+        subtitle="Organize fee structures, targeted student billing, collections and receipts"
+        breadcrumbs={[{ label: "Fees" }]}
+        action={
+          data.canManage ? (
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-secondary" onClick={() => window.print()}>
+                <Printer className="h-4 w-4" />
+                Print
+              </button>
+              <button className="btn-secondary" onClick={openNewStructure}>
+                <Plus className="h-4 w-4" />
+                Fee Structure
+              </button>
+            </div>
+          ) : undefined
+        }
+      />
+      {message && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm font-semibold ${message.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-rose-200 bg-rose-50 text-rose-800"}`}
+        >
+          {message.text}
+        </div>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Summary
+          icon={Receipt}
+          label="Total invoiced"
+          value={data.totals.invoiced}
+          tone="teal"
+        />
+        <Summary
+          icon={Banknote}
+          label="Collected"
+          value={data.totals.collected}
+          tone="emerald"
+        />
+        <Summary
+          icon={WalletCards}
+          label="Outstanding"
+          value={data.totals.outstanding}
+          tone="amber"
+        />
+        <Summary
+          icon={CircleDollarSign}
+          label="Overdue"
+          value={data.totals.overdue}
+          tone="rose"
+        />
+      </div>
+      <nav className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm print:hidden">
+        {(
+          [
+            ["invoices", Receipt, "Invoice Ledger"],
+            ["structures", Settings2, "Fee Structures"],
+            ["collections", CreditCard, "Collections"],
+          ] as const
+        ).map(([key, Icon, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition ${tab === key ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"}`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+        {data.canManage && (
+          <div className="ml-auto flex flex-wrap gap-1.5">
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                const year = data.academicYears?.[0]?.id || "";
+                setBulk({ ...bulk, academicYearId: year });
+                setModal("bulk");
+              }}
+            >
+              <WalletCards className="h-4 w-4" />
+              Targeted Billing
+            </button>
+            <button className="btn-primary" onClick={() => setModal("invoice")}>
+              <FilePlus2 className="h-4 w-4" />
+              Single Invoice
+            </button>
+          </div>
+        )}
+      </nav>
 
-    {tab === 'invoices' && <section className="card overflow-hidden"><div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-sm font-bold text-slate-900">Student invoice ledger</h2><p className="mt-0.5 text-xs text-slate-500">{filtered.length} of {data.invoices.length} invoices</p></div><div className="flex flex-col gap-2 sm:flex-row"><label className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search invoice or student" className="form-input min-w-64 pl-9" /></label><select value={status} onChange={(e) => setStatus(e.target.value)} className="form-input sm:w-40"><option value="ALL">All statuses</option>{['PENDING','PARTIAL','PAID','OVERDUE','CANCELLED'].map(item => <option key={item}>{item}</option>)}</select></div></div>
-      {loading ? <Loading /> : !filtered.length ? <DatabaseEmptyState title="No matching invoices" description="Create an invoice or change the active filters." /> : <div className="overflow-x-auto"><table className="table-base"><thead><tr><th>Invoice</th><th>Student</th><th>Fee</th><th>Net amount</th><th>Paid / Due</th><th>Due date</th><th>Status</th><th className="print:hidden">Actions</th></tr></thead><tbody>{filtered.map((item: any) => <tr key={item.id}><td><p className="font-mono font-semibold text-slate-800">{item.invoiceNumber}</p><p className="mt-1 text-[10px] text-slate-400">{new Date(item.createdAt).toLocaleDateString('en-GB')}</p></td><td><p className="font-semibold text-slate-900">{item.student.nameEn}</p><p className="text-[10px] text-slate-400">{item.student.studentCode} · {item.student.class?.name || 'No class'}</p></td><td>{item.feeStructure.name}<span className="block text-[10px] text-slate-400">{item.feeStructure.frequency}</span></td><td className="font-semibold">{formatCurrency(item.amount - item.discount)}{item.discount > 0 && <span className="block text-[10px] font-normal text-emerald-600">Discount {formatCurrency(item.discount)}</span>}</td><td><span className="text-emerald-700">{formatCurrency(item.paidAmount)}</span><span className="block font-semibold text-amber-700">Due {formatCurrency(item.dueAmount)}</span></td><td>{new Date(`${item.dueDate}T00:00:00`).toLocaleDateString('en-GB')}</td><td><Badge status={item.status} /></td><td className="print:hidden">{data.canManage && item.dueAmount > 0 && item.status !== 'CANCELLED' && <button onClick={() => openPayment(item)} className="mr-2 rounded-lg bg-teal-50 px-3 py-2 font-bold text-teal-700 hover:bg-teal-100">Collect</button>}{data.canManage && item.paidAmount === 0 && item.status !== 'CANCELLED' && <button onClick={() => cancelInvoice(item)} className="rounded-lg px-2 py-2 font-bold text-rose-600 hover:bg-rose-50">Cancel</button>}</td></tr>)}</tbody></table></div>}
-    </section>}
+      {tab === "invoices" && (
+        <section className="card overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Student invoice ledger
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {filtered.length} of {data.invoices.length} invoices
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search invoice or student"
+                  className="form-input min-w-64 pl-9"
+                />
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="form-input sm:w-40"
+              >
+                <option value="ALL">All statuses</option>
+                {["PENDING", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"].map(
+                  (item) => (
+                    <option key={item}>{item}</option>
+                  ),
+                )}
+              </select>
+            </div>
+          </div>
+          {loading ? (
+            <Loading />
+          ) : !filtered.length ? (
+            <DatabaseEmptyState
+              title="No matching invoices"
+              description="Create an invoice or change the active filters."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table-base">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Student</th>
+                    <th>Fee</th>
+                    <th>Net amount</th>
+                    <th>Paid / Due</th>
+                    <th>Due date</th>
+                    <th>Status</th>
+                    <th className="print:hidden">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((item: any) => (
+                    <tr key={item.id}>
+                      <td>
+                        <p className="font-mono font-semibold text-slate-800">
+                          {item.invoiceNumber}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-400">
+                          {new Date(item.createdAt).toLocaleDateString("en-GB")}
+                        </p>
+                      </td>
+                      <td>
+                        <p className="font-semibold text-slate-900">
+                          {item.student.nameEn}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {item.student.studentCode} ·{" "}
+                          {item.student.class?.name || "No class"}
+                        </p>
+                      </td>
+                      <td>
+                        {item.feeStructure.name}
+                        <span className="block text-[10px] text-slate-400">
+                          {item.feeStructure.frequency}
+                        </span>
+                      </td>
+                      <td className="font-semibold">
+                        {formatCurrency(item.amount - item.discount)}
+                        {item.discount > 0 && (
+                          <span className="block text-[10px] font-normal text-emerald-600">
+                            Discount {formatCurrency(item.discount)}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <span className="text-emerald-700">
+                          {formatCurrency(item.paidAmount)}
+                        </span>
+                        <span className="block font-semibold text-amber-700">
+                          Due {formatCurrency(item.dueAmount)}
+                        </span>
+                      </td>
+                      <td>
+                        {new Date(
+                          `${item.dueDate}T00:00:00`,
+                        ).toLocaleDateString("en-GB")}
+                      </td>
+                      <td>
+                        <Badge status={item.status} />
+                      </td>
+                      <td className="print:hidden">
+                        {data.canManage &&
+                          item.dueAmount > 0 &&
+                          item.status !== "CANCELLED" && (
+                            <button
+                              onClick={() => openPayment(item)}
+                              className="mr-2 rounded-lg bg-teal-50 px-3 py-2 font-bold text-teal-700 hover:bg-teal-100"
+                            >
+                              Collect
+                            </button>
+                          )}
+                        {data.canManage &&
+                          item.paidAmount === 0 &&
+                          item.status !== "CANCELLED" && (
+                            <button
+                              onClick={() => cancelInvoice(item)}
+                              className="rounded-lg px-2 py-2 font-bold text-rose-600 hover:bg-rose-50"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
-    {tab === 'structures' && <section className="card p-5"><div className="flex items-center justify-between"><div><h2 className="text-sm font-bold">Fee structures</h2><p className="mt-1 text-xs text-slate-500">Reusable billing templates for student invoices</p></div>{data.canManage && <button className="btn-primary" onClick={openNewStructure}><Plus className="h-4 w-4" />Add Structure</button>}</div>{!data.structures.length ? <DatabaseEmptyState title="No fee structures" description="Add a reusable fee structure to begin invoicing." /> : <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.structures.map((item: any) => <article key={item.id} className="rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between"><span className="rounded-lg bg-teal-50 p-2 text-teal-700"><Receipt className="h-4 w-4" /></span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">{item.frequency}</span></div><h3 className="mt-4 text-sm font-bold">{item.name}</h3><p className="mt-1 text-xl font-black text-slate-900">{formatCurrency(Number(item.amount))}</p><p className="mt-2 min-h-8 text-xs text-slate-500">{item.description || 'No description provided.'}</p>{data.canManage && <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3"><button onClick={() => openEditStructure(item)} className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700 hover:bg-teal-100"><Edit2 className="h-3.5 w-3.5" />Edit</button><button onClick={() => deleteStructure(item)} className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100"><Trash2 className="h-3.5 w-3.5" />Delete</button></div>}</article>)}</div>}</section>}
+      {tab === "structures" && (
+        <section className="card p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold">Fee types & structures</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Categorized templates shared by invoices, student payments and
+                admit-card clearance
+              </p>
+            </div>
+            {data.canManage && (
+              <button className="btn-primary" onClick={openNewStructure}>
+                <Plus className="h-4 w-4" />
+                Add Structure
+              </button>
+            )}
+          </div>
+          {!data.structures.length ? (
+            <DatabaseEmptyState
+              title="No fee structures"
+              description="Add a reusable fee structure to begin invoicing."
+            />
+          ) : (
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {data.structures.map((item: any) => (
+                <article
+                  key={item.id}
+                  className="rounded-xl border border-slate-200 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="rounded-lg bg-teal-50 p-2 text-teal-700">
+                      <Receipt className="h-4 w-4" />
+                    </span>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-700">
+                        {String(item.category || "OTHER").replace(/_/g, " ")}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                        {item.frequency}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="mt-4 text-sm font-bold">{item.name}</h3>
+                  <p className="mt-1 text-xl font-black text-slate-900">
+                    {formatCurrency(Number(item.amount))}
+                  </p>
+                  <p className="mt-2 min-h-8 text-xs text-slate-500">
+                    {item.description || "No description provided."}
+                  </p>
+                  {data.canManage && (
+                    <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
+                      <button
+                        onClick={() => openEditStructure(item)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700 hover:bg-teal-100"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteStructure(item)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
-    {tab === 'collections' && <section className="card overflow-hidden"><div className="border-b border-slate-100 p-5"><h2 className="text-sm font-bold">Payment & receipt history</h2><p className="mt-1 text-xs text-slate-500">Chronological collection register</p></div>{!data.payments.length ? <DatabaseEmptyState title="No collections recorded" description="Payments collected against invoices will appear here." /> : <div className="overflow-x-auto"><table className="table-base"><thead><tr><th>Receipt</th><th>Student</th><th>Invoice</th><th>Method</th><th>Reference</th><th>Date</th><th>Amount</th></tr></thead><tbody>{data.payments.map((item: any) => <tr key={item.id}><td className="font-mono font-semibold">{item.receiptNumber}</td><td><p className="font-semibold">{item.invoice.student.nameEn}</p><p className="text-[10px] text-slate-400">{item.invoice.student.studentCode}</p></td><td className="font-mono">{item.invoice.invoiceNumber}</td><td><Badge status={item.paymentMethod.replace('_', ' ')} /></td><td>{item.transactionId || '—'}</td><td>{new Date(item.paidAt).toLocaleString('en-GB')}</td><td className="font-bold text-emerald-700">{formatCurrency(Number(item.amount))}</td></tr>)}</tbody></table></div>}</section>}
+      {tab === "collections" && (
+        <section className="card overflow-hidden">
+          <div className="border-b border-slate-100 p-5">
+            <h2 className="text-sm font-bold">Payment & receipt history</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Chronological collection register
+            </p>
+          </div>
+          {!data.payments.length ? (
+            <DatabaseEmptyState
+              title="No collections recorded"
+              description="Payments collected against invoices will appear here."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table-base">
+                <thead>
+                  <tr>
+                    <th>Receipt</th>
+                    <th>Student</th>
+                    <th>Invoice</th>
+                    <th>Method</th>
+                    <th>Reference</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.payments.map((item: any) => (
+                    <tr key={item.id}>
+                      <td className="font-mono font-semibold">
+                        {item.receiptNumber}
+                      </td>
+                      <td>
+                        <p className="font-semibold">
+                          {item.invoice.student.nameEn}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {item.invoice.student.studentCode}
+                        </p>
+                      </td>
+                      <td className="font-mono">
+                        {item.invoice.invoiceNumber}
+                      </td>
+                      <td>
+                        <Badge status={item.paymentMethod.replace("_", " ")} />
+                      </td>
+                      <td>{item.transactionId || "—"}</td>
+                      <td>{new Date(item.paidAt).toLocaleString("en-GB")}</td>
+                      <td className="font-bold text-emerald-700">
+                        {formatCurrency(Number(item.amount))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
-    {modal === 'structure' && <Modal title={editingStructureId ? 'Update fee structure' : 'Create fee structure'} subtitle={editingStructureId ? 'Changes apply to future invoice defaults; existing invoices remain unchanged.' : 'Set a reusable fee amount and billing frequency.'} close={() => setModal(null)}><form onSubmit={(e) => { e.preventDefault(); const frequency = structure.frequency === 'CUSTOM' ? customFrequency.trim().toUpperCase().replace(/\s+/g, '_') : structure.frequency; submit({ action: editingStructureId ? 'updateStructure' : 'createStructure', ...(editingStructureId ? { id: editingStructureId } : {}), ...structure, frequency, amount: Number(structure.amount) }, editingStructureId ? 'Fee structure updated.' : 'Fee structure created.'); }}><FormGrid><Input label="Structure name" value={structure.name} change={(v: string) => setStructure({...structure, name:v})} placeholder="Monthly Tuition Fee" /><Input label="Amount" type="number" value={structure.amount} change={(v: string) => setStructure({...structure, amount:v})} /><label><span className="field-label">Frequency</span><select required className="form-input" value={structure.frequency} onChange={(e) => { setStructure({...structure, frequency:e.target.value}); if (e.target.value !== 'CUSTOM') setCustomFrequency(''); }}><option value="">Select frequency</option>{frequencyOptions.map((item: string) => <option key={item} value={item}>{item.replace(/_/g, ' ')}</option>)}<option value="CUSTOM">＋ Add custom frequency</option></select></label>{structure.frequency === 'CUSTOM' && <Input label="Custom frequency" value={customFrequency} change={setCustomFrequency} placeholder="e.g. QUARTERLY" />}<label className="md:col-span-2"><span className="field-label">Description</span><textarea className="form-input min-h-20" value={structure.description} onChange={(e) => setStructure({...structure, description:e.target.value})} /></label></FormGrid><Footer busy={busy} close={() => setModal(null)} label={editingStructureId ? 'Update Structure' : 'Create Structure'} /></form></Modal>}
-    {modal === 'invoice' && <Modal title="Create student invoice" subtitle="Assign a fee structure and due date to a student." close={() => setModal(null)}><form onSubmit={(e) => { e.preventDefault(); submit({ action: 'createInvoice', ...invoice, amount: Number(invoice.amount), discount: Number(invoice.discount) }, 'Student invoice created.'); }}><FormGrid><label><span className="field-label">Student</span><select required className="form-input" value={invoice.studentId} onChange={(e) => setInvoice({...invoice, studentId:e.target.value})}><option value="">Select student</option>{data.students.map((item:any) => <option key={item.id} value={item.id}>{item.nameEn} · {item.studentCode} · {item.class?.name || 'No class'}</option>)}</select></label><label><span className="field-label">Fee structure</span><select required className="form-input" value={invoice.feeStructureId} onChange={(e) => chooseStructure(e.target.value)}><option value="">Select structure</option>{data.structures.map((item:any) => <option key={item.id} value={item.id}>{item.name} · {formatCurrency(Number(item.amount))}</option>)}</select></label><Input label="Amount" type="number" value={invoice.amount} change={(v: string) => setInvoice({...invoice, amount:v})} /><Input label="Discount" type="number" value={invoice.discount} change={(v: string) => setInvoice({...invoice, discount:v})} /><Input label="Due date" type="date" value={invoice.dueDate} change={(v: string) => setInvoice({...invoice, dueDate:v})} /></FormGrid><Footer busy={busy} close={() => setModal(null)} label="Create Invoice" /></form></Modal>}
-    {modal === 'payment' && selected && <Modal title="Collect payment" subtitle={`${selected.invoiceNumber} · ${selected.student.nameEn} · Due ${formatCurrency(selected.dueAmount)}`} close={() => setModal(null)}><form onSubmit={(e) => { e.preventDefault(); submit({ action: 'recordPayment', invoiceId: selected.id, ...payment, amount: Number(payment.amount) }, 'Payment collected and receipt generated.'); }}><FormGrid><Input label="Payment amount" type="number" value={payment.amount} change={(v: string) => setPayment({...payment, amount:v})} /><Select label="Payment method" value={payment.paymentMethod} change={(v: string) => setPayment({...payment, paymentMethod:v})} options={['CASH','BANK_TRANSFER','BKASH','NAGAD','CHEQUE','CARD']} /><Input label="Transaction reference" value={payment.transactionId} change={(v: string) => setPayment({...payment, transactionId:v})} placeholder="Optional for cash" /><label className="md:col-span-2"><span className="field-label">Notes</span><textarea className="form-input min-h-20" value={payment.notes} onChange={(e) => setPayment({...payment, notes:e.target.value})} /></label></FormGrid><Footer busy={busy} close={() => setModal(null)} label="Collect & Issue Receipt" /></form></Modal>}
-    {modal === 'bulk' && <Modal title="Targeted fee billing" subtitle="Generate tuition, exam or event invoices by class, group and section." close={() => setModal(null)}><form onSubmit={(e) => { e.preventDefault(); submit({ action: 'generateTargetedInvoices', ...bulk, amount: Number(bulk.amount) }, 'Targeted invoices generated successfully.'); }}><FormGrid><Select label="Fee category" value={bulk.category} change={(v: string) => setBulk({...bulk, category:v, title: v === 'TUITION' ? 'Monthly Tuition Fee' : '', frequency: v === 'TUITION' ? 'MONTHLY' : 'ONE_TIME', examId: ''})} options={['TUITION','EXAM','EVENT']} /><Input label={bulk.category === 'EVENT' ? 'Event name' : bulk.category === 'EXAM' ? 'Fee title' : 'Fee title'} value={bulk.title} change={(v: string) => setBulk({...bulk, title:v})} placeholder={bulk.category === 'EVENT' ? 'Annual Sports Day' : 'Monthly Tuition Fee'} />{bulk.category === 'EXAM' && <label><span className="field-label">Examination</span><select required className="form-input" value={bulk.examId} onChange={(e) => { const exam = data.exams.find((item:any) => item.id === e.target.value); setBulk({...bulk, examId:e.target.value, title: exam?.name || bulk.title}); }}><option value="">Select examination</option>{data.exams.map((item:any) => <option key={item.id} value={item.id}>{item.name} · {item.year}</option>)}</select></label>}<Input label="Amount per student" type="number" value={bulk.amount} change={(v: string) => setBulk({...bulk, amount:v})} /><Select label="Frequency" value={bulk.frequency} change={(v: string) => setBulk({...bulk, frequency:v})} options={frequencyOptions} /><label><span className="field-label">Academic year</span><select required className="form-input" value={bulk.academicYearId} onChange={(e) => setBulk({...bulk, academicYearId:e.target.value, classId:'', groupId:'', sectionId:''})}><option value="">Select academic year</option>{data.academicYears.map((item:any) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span className="field-label">Class</span><select required className="form-input" value={bulk.classId} onChange={(e) => setBulk({...bulk, classId:e.target.value, groupId:'', sectionId:''})}><option value="">Select class</option>{data.classes.map((item:any) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label><span className="field-label">Group (optional)</span><select className="form-input" value={bulk.groupId} onChange={(e) => setBulk({...bulk, groupId:e.target.value})}><option value="">All groups</option>{data.classGroups.filter((item:any) => item.academicYearId === bulk.academicYearId && item.classId === bulk.classId).map((item:any) => <option key={item.groupId} value={item.groupId}>{item.groupName}</option>)}</select></label><label><span className="field-label">Section (optional)</span><select className="form-input" value={bulk.sectionId} onChange={(e) => setBulk({...bulk, sectionId:e.target.value})}><option value="">All sections</option>{(data.classes.find((item:any) => item.id === bulk.classId)?.sections || []).map((item:any) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><Input label="Due date" type="date" value={bulk.dueDate} change={(v: string) => setBulk({...bulk, dueDate:v})} /></FormGrid><div className="mx-5 mb-5 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs text-teal-800">One invoice will be generated for every active student matching the selected academic year, class, optional group and optional section. Existing matching invoices for the same due date are skipped.</div><Footer busy={busy} close={() => setModal(null)} label="Generate Invoices" /></form></Modal>}
-  </div>;
+      {modal === "structure" && (
+        <Modal
+          title={editingStructureId ? "Update fee type" : "Create fee type"}
+          subtitle={
+            editingStructureId
+              ? "Changes apply to future invoice defaults; existing invoices remain unchanged."
+              : "Set a reusable fee amount and billing frequency."
+          }
+          close={() => setModal(null)}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const frequency =
+                structure.frequency === "CUSTOM"
+                  ? customFrequency.trim().toUpperCase().replace(/\s+/g, "_")
+                  : structure.frequency;
+              submit(
+                {
+                  action: editingStructureId
+                    ? "updateStructure"
+                    : "createStructure",
+                  ...(editingStructureId ? { id: editingStructureId } : {}),
+                  ...structure,
+                  frequency,
+                  amount: Number(structure.amount),
+                },
+                editingStructureId
+                  ? "Fee structure updated."
+                  : "Fee structure created.",
+              );
+            }}
+          >
+            <FormGrid>
+              <Input
+                label="Fee name"
+                value={structure.name}
+                change={(v: string) => setStructure({ ...structure, name: v })}
+                placeholder="Monthly Tuition Fee"
+              />
+              <Select
+                label="Category"
+                value={structure.category}
+                change={(v: string) =>
+                  setStructure({ ...structure, category: v })
+                }
+                options={[
+                  "TUITION",
+                  "ADMISSION",
+                  "EXAM",
+                  "SESSION",
+                  "TRANSPORT",
+                  "LAB",
+                  "LIBRARY",
+                  "LATE_FINE",
+                  "EVENT",
+                  "OTHER",
+                ]}
+              />
+              <Input
+                label="Amount"
+                type="number"
+                value={structure.amount}
+                change={(v: string) =>
+                  setStructure({ ...structure, amount: v })
+                }
+              />
+              <label>
+                <span className="field-label">Frequency</span>
+                <select
+                  required
+                  className="form-input"
+                  value={structure.frequency}
+                  onChange={(e) => {
+                    setStructure({ ...structure, frequency: e.target.value });
+                    if (e.target.value !== "CUSTOM") setCustomFrequency("");
+                  }}
+                >
+                  <option value="">Select frequency</option>
+                  {frequencyOptions.map((item: string) => (
+                    <option key={item} value={item}>
+                      {item.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                  <option value="CUSTOM">＋ Add custom frequency</option>
+                </select>
+              </label>
+              {structure.frequency === "CUSTOM" && (
+                <Input
+                  label="Custom frequency"
+                  value={customFrequency}
+                  change={setCustomFrequency}
+                  placeholder="e.g. QUARTERLY"
+                />
+              )}
+              <label className="md:col-span-2">
+                <span className="field-label">Description</span>
+                <textarea
+                  className="form-input min-h-20"
+                  value={structure.description}
+                  onChange={(e) =>
+                    setStructure({ ...structure, description: e.target.value })
+                  }
+                />
+              </label>
+            </FormGrid>
+            <Footer
+              busy={busy}
+              close={() => setModal(null)}
+              label={
+                editingStructureId ? "Update Structure" : "Create Structure"
+              }
+            />
+          </form>
+        </Modal>
+      )}
+      {modal === "invoice" && (
+        <Modal
+          title="Create student invoice"
+          subtitle="Assign a fee structure and due date to a student."
+          close={() => setModal(null)}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(
+                {
+                  action: "createInvoice",
+                  ...invoice,
+                  amount: Number(invoice.amount),
+                  discount: Number(invoice.discount),
+                },
+                "Student invoice created.",
+              );
+            }}
+          >
+            <FormGrid>
+              <label>
+                <span className="field-label">Student</span>
+                <select
+                  required
+                  className="form-input"
+                  value={invoice.studentId}
+                  onChange={(e) =>
+                    setInvoice({ ...invoice, studentId: e.target.value })
+                  }
+                >
+                  <option value="">Select student</option>
+                  {data.students.map((item: any) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nameEn} · {item.studentCode} ·{" "}
+                      {item.class?.name || "No class"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">Fee structure</span>
+                <select
+                  required
+                  className="form-input"
+                  value={invoice.feeStructureId}
+                  onChange={(e) => chooseStructure(e.target.value)}
+                >
+                  <option value="">Select structure</option>
+                  {data.structures.map((item: any) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {formatCurrency(Number(item.amount))}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Input
+                label="Amount"
+                type="number"
+                value={invoice.amount}
+                change={(v: string) => setInvoice({ ...invoice, amount: v })}
+              />
+              <Input
+                label="Discount"
+                type="number"
+                value={invoice.discount}
+                change={(v: string) => setInvoice({ ...invoice, discount: v })}
+              />
+              <Input
+                label="Due date"
+                type="date"
+                value={invoice.dueDate}
+                change={(v: string) => setInvoice({ ...invoice, dueDate: v })}
+              />
+            </FormGrid>
+            <Footer
+              busy={busy}
+              close={() => setModal(null)}
+              label="Create Invoice"
+            />
+          </form>
+        </Modal>
+      )}
+      {modal === "payment" && selected && (
+        <Modal
+          title="Collect payment"
+          subtitle={`${selected.invoiceNumber} · ${selected.student.nameEn} · Due ${formatCurrency(selected.dueAmount)}`}
+          close={() => setModal(null)}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(
+                {
+                  action: "recordPayment",
+                  invoiceId: selected.id,
+                  ...payment,
+                  amount: Number(payment.amount),
+                },
+                "Payment collected and receipt generated.",
+              );
+            }}
+          >
+            <FormGrid>
+              <Input
+                label="Payment amount"
+                type="number"
+                value={payment.amount}
+                change={(v: string) => setPayment({ ...payment, amount: v })}
+              />
+              <Select
+                label="Payment method"
+                value={payment.paymentMethod}
+                change={(v: string) =>
+                  setPayment({ ...payment, paymentMethod: v })
+                }
+                options={[
+                  "CASH",
+                  "BANK_TRANSFER",
+                  "BKASH",
+                  "NAGAD",
+                  "CHEQUE",
+                  "CARD",
+                ]}
+              />
+              <Input
+                label="Transaction reference"
+                value={payment.transactionId}
+                change={(v: string) =>
+                  setPayment({ ...payment, transactionId: v })
+                }
+                placeholder="Optional for cash"
+              />
+              <label className="md:col-span-2">
+                <span className="field-label">Notes</span>
+                <textarea
+                  className="form-input min-h-20"
+                  value={payment.notes}
+                  onChange={(e) =>
+                    setPayment({ ...payment, notes: e.target.value })
+                  }
+                />
+              </label>
+            </FormGrid>
+            <Footer
+              busy={busy}
+              close={() => setModal(null)}
+              label="Collect & Issue Receipt"
+            />
+          </form>
+        </Modal>
+      )}
+      {modal === "bulk" && (
+        <Modal
+          title="Targeted fee billing"
+          subtitle="Choose any fee type, then generate invoices by class, group and section."
+          close={() => setModal(null)}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(
+                {
+                  action: "generateTargetedInvoices",
+                  ...bulk,
+                },
+                "Targeted invoices generated successfully.",
+              );
+            }}
+          >
+            <FormGrid>
+              <Select
+                label="Fee category"
+                value={bulk.category}
+                change={(v: string) => {
+                  const selected = data.structures.find(
+                    (item: any) => item.category === v,
+                  );
+                  setBulk({
+                    ...bulk,
+                    category: v,
+                    feeStructureId: selected?.id || "",
+                    examId: "",
+                  });
+                }}
+                options={[
+                  "TUITION",
+                  "ADMISSION",
+                  "EXAM",
+                  "SESSION",
+                  "TRANSPORT",
+                  "LAB",
+                  "LIBRARY",
+                  "LATE_FINE",
+                  "EVENT",
+                  "OTHER",
+                ]}
+              />
+              <label>
+                <span className="field-label">Fee structure</span>
+                <select
+                  required
+                  className="form-input"
+                  value={bulk.feeStructureId}
+                  onChange={(e) => {
+                    setBulk({
+                      ...bulk,
+                      feeStructureId: e.target.value,
+                    });
+                  }}
+                >
+                  <option value="">Select fee structure</option>
+                  {data.structures
+                    .filter((item: any) => item.category === bulk.category)
+                    .map((item: any) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} · {formatCurrency(Number(item.amount))}
+                      </option>
+                    ))}
+                </select>
+                {!data.structures.some(
+                  (item: any) => item.category === bulk.category,
+                ) && (
+                  <span className="mt-1 block text-[10px] font-semibold text-amber-700">
+                    Create a {bulk.category.replace(/_/g, " ")} fee structure
+                    first.
+                  </span>
+                )}
+              </label>
+              {bulk.feeStructureId &&
+                (() => {
+                  const selected = data.structures.find(
+                    (item: any) => item.id === bulk.feeStructureId,
+                  );
+                  return selected ? (
+                    <div className="md:col-span-2 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Amount per student
+                        </p>
+                        <p className="mt-1 text-base font-black text-slate-900">
+                          {formatCurrency(Number(selected.amount))}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Frequency
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
+                          {String(selected.frequency).replace(/_/g, " ")}
+                        </p>
+                      </div>
+                      <p className="sm:col-span-2 text-[10px] text-slate-500">
+                        Amount and frequency come from the selected fee
+                        structure. Edit the fee type to change these defaults.
+                      </p>
+                    </div>
+                  ) : null;
+                })()}
+              {bulk.category === "EXAM" && (
+                <label>
+                  <span className="field-label">Examination</span>
+                  <select
+                    required
+                    className="form-input"
+                    value={bulk.examId}
+                    onChange={(e) => {
+                      setBulk({
+                        ...bulk,
+                        examId: e.target.value,
+                      });
+                    }}
+                  >
+                    <option value="">Select examination</option>
+                    {data.exams.map((item: any) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} · {item.year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <label>
+                <span className="field-label">Academic year</span>
+                <select
+                  required
+                  className="form-input"
+                  value={bulk.academicYearId}
+                  onChange={(e) =>
+                    setBulk({
+                      ...bulk,
+                      academicYearId: e.target.value,
+                      classId: "",
+                      groupId: "",
+                      sectionId: "",
+                    })
+                  }
+                >
+                  <option value="">Select academic year</option>
+                  {data.academicYears.map((item: any) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">Class</span>
+                <select
+                  className="form-input"
+                  value={bulk.classId}
+                  onChange={(e) =>
+                    setBulk({
+                      ...bulk,
+                      classId: e.target.value,
+                      groupId: "",
+                      sectionId: "",
+                    })
+                  }
+                >
+                  <option value="">All classes</option>
+                  {data.classes.map((item: any) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">Group (optional)</span>
+                <select
+                  className="form-input"
+                  value={bulk.groupId}
+                  onChange={(e) =>
+                    setBulk({ ...bulk, groupId: e.target.value })
+                  }
+                >
+                  <option value="">All groups</option>
+                  {data.classGroups
+                    .filter(
+                      (item: any) =>
+                        item.academicYearId === bulk.academicYearId &&
+                        item.classId === bulk.classId,
+                    )
+                    .map((item: any) => (
+                      <option key={item.groupId} value={item.groupId}>
+                        {item.groupName}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">Section (optional)</span>
+                <select
+                  className="form-input"
+                  value={bulk.sectionId}
+                  onChange={(e) =>
+                    setBulk({ ...bulk, sectionId: e.target.value })
+                  }
+                >
+                  <option value="">All sections</option>
+                  {(
+                    data.classes.find((item: any) => item.id === bulk.classId)
+                      ?.sections || []
+                  ).map((item: any) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Input
+                label="Due date"
+                type="date"
+                value={bulk.dueDate}
+                change={(v: string) => setBulk({ ...bulk, dueDate: v })}
+              />
+            </FormGrid>
+            <div className="mx-5 mb-5 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs text-teal-800">
+              One invoice will be generated for every active student matching
+              the selected academic year. Choose All classes for the whole
+              school, or select a class with optional group and section filters.
+              Existing matching invoices for the same due date are skipped.
+            </div>
+            <Footer
+              busy={busy}
+              close={() => setModal(null)}
+              label="Generate Invoices"
+            />
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
 }
 
-function Summary({ icon: Icon, label, value, tone }: any) { const colors:any = { teal:'bg-teal-50 text-teal-700', emerald:'bg-emerald-50 text-emerald-700', amber:'bg-amber-50 text-amber-700', rose:'bg-rose-50 text-rose-700' }; return <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-2 text-xl font-black text-slate-900">{formatCurrency(Number(value))}</p></div><span className={`rounded-lg p-2 ${colors[tone]}`}><Icon className="h-4 w-4" /></span></div></div>; }
-function Badge({ status }: { status: string }) { const style = status === 'PAID' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : status === 'PARTIAL' ? 'border-blue-200 bg-blue-50 text-blue-700' : status === 'OVERDUE' || status === 'CANCELLED' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700'; return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${style}`}>{status}</span>; }
-function Modal({ title, subtitle, close, children }: any) { return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/45 p-4 backdrop-blur-xs"><div className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b border-slate-200 p-5"><div><h2 className="text-lg font-bold">{title}</h2><p className="mt-1 text-xs text-slate-500">{subtitle}</p></div><button type="button" onClick={close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>{children}</div></div>; }
-function FormGrid({ children }: any) { return <div className="grid gap-4 p-5 md:grid-cols-2">{children}</div>; }
-function Footer({ busy, close, label }: any) { return <div className="flex justify-end gap-2 border-t border-slate-200 p-5"><button type="button" className="btn-secondary" onClick={close}>Cancel</button><button disabled={busy} className="btn-primary">{busy ? 'Saving…' : label}</button></div>; }
-function Input({ label, value, change, type='text', placeholder='' }: any) { return <label><span className="field-label">{label}</span><input required={label !== 'Transaction reference'} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.01' : undefined} type={type} value={value} onChange={(e) => change(e.target.value)} placeholder={placeholder} className="form-input" /></label>; }
-function Select({ label, value, change, options }: any) { return <label><span className="field-label">{label}</span><select required className="form-input" value={value} onChange={(e) => change(e.target.value)}>{options.map((item:string) => <option key={item} value={item}>{item.replace(/_/g, ' ')}</option>)}</select></label>; }
-function Loading() { return <div className="space-y-2 p-5 animate-pulse"><div className="h-12 rounded bg-slate-100" /><div className="h-12 rounded bg-slate-50" /><div className="h-12 rounded bg-slate-50" /></div>; }
+function Summary({ icon: Icon, label, value, tone }: any) {
+  const colors: any = {
+    teal: "bg-teal-50 text-teal-700",
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    rose: "bg-rose-50 text-rose-700",
+  };
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            {label}
+          </p>
+          <p className="mt-2 text-xl font-black text-slate-900">
+            {formatCurrency(Number(value))}
+          </p>
+        </div>
+        <span className={`rounded-lg p-2 ${colors[tone]}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+    </div>
+  );
+}
+function Badge({ status }: { status: string }) {
+  const style =
+    status === "PAID"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : status === "PARTIAL"
+        ? "border-blue-200 bg-blue-50 text-blue-700"
+        : status === "OVERDUE" || status === "CANCELLED"
+          ? "border-rose-200 bg-rose-50 text-rose-700"
+          : "border-amber-200 bg-amber-50 text-amber-700";
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${style}`}
+    >
+      {status}
+    </span>
+  );
+}
+function Modal({ title, subtitle, close, children }: any) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/45 p-4 backdrop-blur-xs">
+      <div className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-slate-200 p-5">
+          <div>
+            <h2 className="text-lg font-bold">{title}</h2>
+            <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+          </div>
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+function FormGrid({ children }: any) {
+  return <div className="grid gap-4 p-5 md:grid-cols-2">{children}</div>;
+}
+function Footer({ busy, close, label }: any) {
+  return (
+    <div className="flex justify-end gap-2 border-t border-slate-200 p-5">
+      <button type="button" className="btn-secondary" onClick={close}>
+        Cancel
+      </button>
+      <button disabled={busy} className="btn-primary">
+        {busy ? "Saving…" : label}
+      </button>
+    </div>
+  );
+}
+function Input({ label, value, change, type = "text", placeholder = "" }: any) {
+  return (
+    <label>
+      <span className="field-label">{label}</span>
+      <input
+        required={label !== "Transaction reference"}
+        min={type === "number" ? 0 : undefined}
+        step={type === "number" ? "0.01" : undefined}
+        type={type}
+        value={value}
+        onChange={(e) => change(e.target.value)}
+        placeholder={placeholder}
+        className="form-input"
+      />
+    </label>
+  );
+}
+function Select({ label, value, change, options }: any) {
+  return (
+    <label>
+      <span className="field-label">{label}</span>
+      <select
+        required
+        className="form-input"
+        value={value}
+        onChange={(e) => change(e.target.value)}
+      >
+        {options.map((item: string) => (
+          <option key={item} value={item}>
+            {item.replace(/_/g, " ")}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+function Loading() {
+  return (
+    <div className="space-y-2 p-5 animate-pulse">
+      <div className="h-12 rounded bg-slate-100" />
+      <div className="h-12 rounded bg-slate-50" />
+      <div className="h-12 rounded bg-slate-50" />
+    </div>
+  );
+}

@@ -199,7 +199,7 @@ async function main() {
     Teacher: [
       'dashboard.view', 'academic.view', 'students.view', 'routines.view',
       'attendance.view', 'attendance.manage', 'exams.view', 'homework.view', 'homework.manage',
-      'marks.enter', 'portal.teacher.view',
+      'marks.enter', 'portal.teacher.view', 'portal.employee.view', 'leave.view',
     ],
     Employee: ['portal.employee.view', 'leave.view'],
     Student: ['portal.student.view'],

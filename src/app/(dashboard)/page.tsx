@@ -28,6 +28,24 @@ export default async function DashboardPage() {
   const session = await getCurrentSession();
   if (!session) redirect('/login');
 
+  const managementRoles = [
+    'Super Admin',
+    'School Admin',
+    'Academic Admin',
+    'Admission Officer',
+    'Accountant',
+    'HR Manager',
+  ];
+  const isTeacherOnly =
+    session.roles.includes('Teacher') &&
+    !session.roles.some((role) => managementRoles.includes(role));
+
+  if (isTeacherOnly) redirect('/teacher');
+  const isStudentOnly =
+    session.roles.includes('Student') &&
+    !session.roles.some((role) => managementRoles.includes(role));
+  if (isStudentOnly) redirect('/student');
+
   const canViewManagementDashboard =
     session.roles.includes('Super Admin') ||
     session.permissions.includes('dashboard.view');

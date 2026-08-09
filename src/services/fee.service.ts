@@ -1,34 +1,34 @@
-'use server';
+"use server";
 
-import prisma from '@/src/lib/db/prisma';
-import { toClientData } from '@/src/lib/serialize';
-import { createAuditLog } from '@/src/lib/audit';
+import prisma from "@/src/lib/db/prisma";
+import { toClientData } from "@/src/lib/serialize";
+import { createAuditLog } from "@/src/lib/audit";
 import {
   calculateInvoiceBreakdown,
   allocatePaymentToInvoiceItems,
   determinePaymentStatus,
   canIssueAdmitCard,
-} from '@/src/lib/validations/fee';
+} from "@/src/lib/validations/fee";
 
 export async function getFeeOverview(schoolId?: string) {
-    const [totalCollected, totalPending] = await Promise.all([
-      prisma.feeInvoice.aggregate({
-        where: schoolId ? { schoolId } : undefined,
-        _sum: { paidAmount: true },
-      }),
-      prisma.studentInvoice.aggregate({
+  const [totalCollected, totalPending] = await Promise.all([
+    prisma.feeInvoice.aggregate({
+      where: schoolId ? { schoolId } : undefined,
+      _sum: { paidAmount: true },
+    }),
+    prisma.studentInvoice.aggregate({
       where: {
         ...(schoolId ? { schoolId } : {}),
-        paymentStatus: { in: ['unpaid', 'partially_paid', 'overdue'] },
+        paymentStatus: { in: ["unpaid", "partially_paid", "overdue"] },
       },
       _sum: { dueAmount: true },
-      }),
-    ]);
+    }),
+  ]);
 
-    return {
-      collectedAmount: Number(totalCollected._sum.paidAmount ?? 0),
-      pendingAmount: Number(totalPending._sum.dueAmount ?? 0),
-    };
+  return {
+    collectedAmount: Number(totalCollected._sum.paidAmount ?? 0),
+    pendingAmount: Number(totalPending._sum.dueAmount ?? 0),
+  };
 }
 
 export interface BulkMonthlyInvoicePayload {
@@ -60,7 +60,7 @@ export interface PaymentProcessPayload {
   studentId: string;
   invoiceId: string;
   amount: number;
-  paymentMethod: 'Cash' | 'Bank' | 'Mobile Financial Service' | 'Online';
+  paymentMethod: "Cash" | "Bank" | "Mobile Financial Service" | "Online";
   transactionReference?: string;
   accountHead?: string;
   collectedById?: string;
@@ -79,10 +79,12 @@ export interface PaymentReversalPayload {
 // -------------------------------------------------------------
 
 export async function getFeeTypes(schoolId: string) {
-    return toClientData(await prisma.feeType.findMany({
+  return toClientData(
+    await prisma.feeType.findMany({
       where: { schoolId },
-      orderBy: { name: 'asc' },
-    }));
+      orderBy: { name: "asc" },
+    }),
+  );
 }
 
 export async function createFeeType(data: {
@@ -108,14 +110,14 @@ export async function createFeeType(data: {
 
     await createAuditLog({
       schoolId,
-      action: 'CREATE',
-      module: 'FEE_MANAGEMENT',
+      action: "CREATE",
+      module: "FEE_MANAGEMENT",
       details: `Created Fee Type ${data.name} (${data.code})`,
     });
 
     return toClientData(created);
   } catch (error) {
-    console.error('Failed to create fee type:', error);
+    console.error("Failed to create fee type:", error);
     throw error;
   }
 }
@@ -124,18 +126,36 @@ export async function createFeeType(data: {
 // BULK MONTHLY INVOICE GENERATION
 // -------------------------------------------------------------
 
-export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePayload) {
-  const { schoolId, academicYearId, billingYear, billingMonth, classId, sectionId, includePreviousDues, generatedById } = payload;
+export async function generateBulkMonthlyInvoices(
+  payload: BulkMonthlyInvoicePayload,
+) {
+  const {
+    schoolId,
+    academicYearId,
+    billingYear,
+    billingMonth,
+    classId,
+    sectionId,
+    includePreviousDues,
+    generatedById,
+  } = payload;
 
   try {
+    const tuitionFeeType = await prisma.feeType.findUnique({
+      where: { schoolId_code: { schoolId, code: "TUITION" } },
+    });
+    if (!tuitionFeeType)
+      throw new Error(
+        "Create a TUITION fee type before generating monthly invoices.",
+      );
     // 1. Fetch Active Enrollments
-    const enrollments = await (prisma as any).enrollment.findMany({
+    const enrollments = await prisma.studentEnrollment.findMany({
       where: {
         schoolId,
         academicYearId,
         classId,
         ...(sectionId ? { sectionId } : {}),
-        status: 'ACTIVE',
+        enrollmentStatus: "ACTIVE",
       },
       include: {
         student: true,
@@ -149,7 +169,7 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
         academicYearId,
         classId,
         ...(sectionId ? { sectionId } : {}),
-        status: 'ACTIVE',
+        status: "ACTIVE",
       },
     });
 
@@ -169,7 +189,7 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
           enrollmentId: enr.id,
           billingYear,
           billingMonth,
-          feeTypeId: 'ft-tuition',
+          feeTypeId: tuitionFeeType.id,
         },
       });
 
@@ -180,10 +200,10 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
 
       // Check scholarships & waivers
       const scholarships = await (prisma as any).scholarship.findMany({
-        where: { schoolId, studentId: enr.studentId, status: 'ACTIVE' },
+        where: { schoolId, studentId: enr.studentId, status: "ACTIVE" },
       });
       const waivers = await (prisma as any).feeWaiver.findMany({
-        where: { schoolId, studentId: enr.studentId, status: 'ACTIVE' },
+        where: { schoolId, studentId: enr.studentId, status: "ACTIVE" },
       });
 
       // Calculate previous dues if requested
@@ -193,7 +213,7 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
           where: {
             schoolId,
             studentId: enr.studentId,
-            paymentStatus: { in: ['unpaid', 'partially_paid', 'overdue'] },
+            paymentStatus: { in: ["unpaid", "partially_paid", "overdue"] },
           },
           _sum: { dueAmount: true },
         });
@@ -201,8 +221,12 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
       }
 
       // Base amount calculation
-      const studentSchedule = feeSchedules.find((s: any) => s.studentId === enr.studentId) || feeSchedules[0];
-      const baseAmount = studentSchedule ? Number(studentSchedule.monthlyAmount) : 2500;
+      const studentSchedule =
+        feeSchedules.find((s: any) => s.studentId === enr.studentId) ||
+        feeSchedules[0];
+      const baseAmount = studentSchedule
+        ? Number(studentSchedule.monthlyAmount)
+        : 2500;
 
       const calc = calculateInvoiceBreakdown({
         baseAmount,
@@ -212,12 +236,12 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
         })),
         waivers: waivers.map((w: any) => ({
           waiverValue: Number(w.waiverValue),
-          waiverType: w.waiverType as 'PERCENTAGE' | 'FIXED',
+          waiverType: w.waiverType as "PERCENTAGE" | "FIXED",
         })),
         previousDue,
       });
 
-      const invNo = `INV-${billingYear}${String(billingMonth).padStart(2, '0')}-${enr.studentId.slice(-4)}-${Date.now().toString().slice(-4)}`;
+      const invNo = `INV-${billingYear}${String(billingMonth).padStart(2, "0")}-${enr.studentId.slice(-4)}-${Date.now().toString().slice(-4)}`;
 
       // Save Invoice inside Prisma transaction
       await (prisma as any).$transaction(async (tx: any) => {
@@ -230,7 +254,7 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
             invoiceNumber: invNo,
             billingYear,
             billingMonth,
-            feeTypeId: 'ft-tuition',
+            feeTypeId: tuitionFeeType.id,
             issueDate,
             dueDate,
             subtotal: calc.subtotal,
@@ -242,15 +266,22 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
             totalAmount: calc.totalAmount,
             paidAmount: 0,
             dueAmount: calc.dueAmount,
-            paymentStatus: 'unpaid',
+            paymentStatus: "unpaid",
             items: {
               create: [
                 {
-                  feeTypeId: 'ft-tuition',
+                  feeTypeId: tuitionFeeType.id,
                   description: `Monthly Tuition Fee (${billingMonth}/${billingYear})`,
                   amount: calc.subtotal,
-                  discount: calc.discountAmount + calc.scholarshipAmount + calc.waiverAmount,
-                  netAmount: calc.subtotal - calc.discountAmount - calc.scholarshipAmount - calc.waiverAmount,
+                  discount:
+                    calc.discountAmount +
+                    calc.scholarshipAmount +
+                    calc.waiverAmount,
+                  netAmount:
+                    calc.subtotal -
+                    calc.discountAmount -
+                    calc.scholarshipAmount -
+                    calc.waiverAmount,
                   paidAmount: 0,
                 },
               ],
@@ -264,8 +295,8 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
             schoolId,
             studentId: enr.studentId,
             attendanceDate: issueDate,
-            channel: 'PORTAL',
-            deliveryStatus: 'DELIVERED',
+            channel: "PORTAL",
+            deliveryStatus: "DELIVERED",
             message: `Monthly Invoice ${invoice.invoiceNumber} generated for ${billingMonth}/${billingYear}. Amount Due: ৳${calc.dueAmount}`,
           },
         });
@@ -277,9 +308,9 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
 
     await createAuditLog({
       schoolId,
-      userId: generatedById || 'system',
-      action: 'CREATE',
-      module: 'FEE_INVOICE_GENERATION',
+      userId: generatedById || "system",
+      action: "CREATE",
+      module: "FEE_INVOICE_GENERATION",
       details: `Generated ${generatedCount} invoices for ${billingMonth}/${billingYear}. Total amount: ৳${totalInvoicedAmount}`,
     });
 
@@ -292,8 +323,10 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
       billingMonth,
     };
   } catch (error) {
-    console.error('Bulk invoice generation failed:', error);
-    throw new Error('Bulk invoices could not be generated. No records were created.');
+    console.error("Bulk invoice generation failed:", error);
+    throw new Error(
+      "Bulk invoices could not be generated. No records were created.",
+    );
   }
 }
 
@@ -302,16 +335,26 @@ export async function generateBulkMonthlyInvoices(payload: BulkMonthlyInvoicePay
 // -------------------------------------------------------------
 
 export async function generateExamFeeInvoices(payload: ExamFeeInvoicePayload) {
-  const { schoolId, academicYearId, examId, classId, sectionId, feeTypeId, amount, dueDate, generatedById } = payload;
+  const {
+    schoolId,
+    academicYearId,
+    examId,
+    classId,
+    sectionId,
+    feeTypeId,
+    amount,
+    dueDate,
+    generatedById,
+  } = payload;
 
   try {
-    const enrollments = await (prisma as any).enrollment.findMany({
+    const enrollments = await prisma.studentEnrollment.findMany({
       where: {
         schoolId,
         academicYearId,
         classId,
         ...(sectionId ? { sectionId } : {}),
-        status: 'ACTIVE',
+        enrollmentStatus: "ACTIVE",
       },
     });
 
@@ -357,7 +400,7 @@ export async function generateExamFeeInvoices(payload: ExamFeeInvoicePayload) {
           totalAmount: amount,
           paidAmount: 0,
           dueAmount: amount,
-          paymentStatus: 'unpaid',
+          paymentStatus: "unpaid",
           items: {
             create: [
               {
@@ -378,15 +421,15 @@ export async function generateExamFeeInvoices(payload: ExamFeeInvoicePayload) {
 
     await createAuditLog({
       schoolId,
-      userId: generatedById || 'system',
-      action: 'CREATE',
-      module: 'EXAM_FEE',
+      userId: generatedById || "system",
+      action: "CREATE",
+      module: "EXAM_FEE",
       details: `Generated ${generatedCount} exam fee invoices for exam ${examId}`,
     });
 
     return { success: true, generatedCount, skippedCount };
   } catch (error) {
-    console.error('Failed to generate bulk exam fee invoices:', error);
+    console.error("Failed to generate bulk exam fee invoices:", error);
     throw error;
   }
 }
@@ -396,7 +439,17 @@ export async function generateExamFeeInvoices(payload: ExamFeeInvoicePayload) {
 // -------------------------------------------------------------
 
 export async function processPayment(payload: PaymentProcessPayload) {
-  const { schoolId, studentId, invoiceId, amount, paymentMethod, transactionReference, accountHead, collectedById, remarks } = payload;
+  const {
+    schoolId,
+    studentId,
+    invoiceId,
+    amount,
+    paymentMethod,
+    transactionReference,
+    accountHead,
+    collectedById,
+    remarks,
+  } = payload;
 
   try {
     const invoice = await (prisma as any).studentInvoice.findUnique({
@@ -405,11 +458,11 @@ export async function processPayment(payload: PaymentProcessPayload) {
     });
 
     if (!invoice) {
-      throw new Error('Invoice not found');
+      throw new Error("Invoice not found");
     }
 
     if (invoice.dueAmount <= 0) {
-      throw new Error('Invoice is already fully paid');
+      throw new Error("Invoice is already fully paid");
     }
 
     const payNo = `PAY-${Date.now().toString().slice(-6)}`;
@@ -426,8 +479,15 @@ export async function processPayment(payload: PaymentProcessPayload) {
     });
 
     const newInvoicePaid = Number(invoice.paidAmount) + amount;
-    const newInvoiceDue = Math.max(0, Number(invoice.totalAmount) - newInvoicePaid);
-    const newStatus = determinePaymentStatus(Number(invoice.totalAmount), newInvoicePaid, invoice.dueDate.toISOString());
+    const newInvoiceDue = Math.max(
+      0,
+      Number(invoice.totalAmount) - newInvoicePaid,
+    );
+    const newStatus = determinePaymentStatus(
+      Number(invoice.totalAmount),
+      newInvoicePaid,
+      invoice.dueDate.toISOString(),
+    );
 
     // Execute within Prisma transaction
     const result = await (prisma as any).$transaction(async (tx: any) => {
@@ -441,11 +501,11 @@ export async function processPayment(payload: PaymentProcessPayload) {
           paymentDate: new Date(),
           paymentMethod,
           transactionReference,
-          accountHead: accountHead || 'Tuition Fee Account',
+          accountHead: accountHead || "Tuition Fee Account",
           amount,
           collectedById,
           remarks,
-          status: 'CONFIRMED',
+          status: "CONFIRMED",
           allocations: {
             create: allocation.allocations.map((alloc) => ({
               invoiceItemId: alloc.invoiceItemId,
@@ -490,9 +550,9 @@ export async function processPayment(payload: PaymentProcessPayload) {
         data: {
           schoolId,
           transactionNumber: `TXN-${Date.now().toString().slice(-6)}`,
-          accountId: 'acc-main-cash',
-          transactionType: 'CREDIT',
-          category: 'FEE_COLLECTION',
+          accountId: "acc-main-cash",
+          transactionType: "CREDIT",
+          category: "FEE_COLLECTION",
           amount,
           referenceId: payment.id,
           description: `Fee collection for Invoice ${invoice.invoiceNumber}`,
@@ -505,9 +565,9 @@ export async function processPayment(payload: PaymentProcessPayload) {
 
     await createAuditLog({
       schoolId,
-      userId: collectedById || 'system',
-      action: 'CREATE',
-      module: 'PAYMENT_COLLECTION',
+      userId: collectedById || "system",
+      action: "CREATE",
+      module: "PAYMENT_COLLECTION",
       details: `Collected payment ৳${amount} for invoice ${invoice.invoiceNumber} via ${paymentMethod}`,
     });
 
@@ -520,8 +580,8 @@ export async function processPayment(payload: PaymentProcessPayload) {
       paymentStatus: result.newStatus,
     };
   } catch (err) {
-    console.error('Payment processing failed:', err);
-    throw new Error('Payment could not be saved. No receipt was issued.');
+    console.error("Payment processing failed:", err);
+    throw new Error("Payment could not be saved. No receipt was issued.");
   }
 }
 
@@ -538,8 +598,9 @@ export async function processPaymentReversal(payload: PaymentReversalPayload) {
       include: { allocations: true },
     });
 
-    if (!payment) throw new Error('Payment record not found');
-    if (payment.status === 'REVERSED') throw new Error('Payment is already reversed');
+    if (!payment) throw new Error("Payment record not found");
+    if (payment.status === "REVERSED")
+      throw new Error("Payment is already reversed");
 
     const revNo = `REV-${Date.now().toString().slice(-6)}`;
 
@@ -547,7 +608,7 @@ export async function processPaymentReversal(payload: PaymentReversalPayload) {
       // 1. Mark Payment as Reversed
       await tx.payment.update({
         where: { id: paymentId },
-        data: { status: 'REVERSED' },
+        data: { status: "REVERSED" },
       });
 
       // 2. Log Reversal Record
@@ -564,11 +625,20 @@ export async function processPaymentReversal(payload: PaymentReversalPayload) {
 
       // 3. Restore Invoice Balances
       if (payment.invoiceId) {
-        const invoice = await tx.studentInvoice.findUnique({ where: { id: payment.invoiceId } });
+        const invoice = await tx.studentInvoice.findUnique({
+          where: { id: payment.invoiceId },
+        });
         if (invoice) {
-          const updatedPaid = Math.max(0, Number(invoice.paidAmount) - Number(payment.amount));
+          const updatedPaid = Math.max(
+            0,
+            Number(invoice.paidAmount) - Number(payment.amount),
+          );
           const updatedDue = Number(invoice.totalAmount) - updatedPaid;
-          const updatedStatus = determinePaymentStatus(Number(invoice.totalAmount), updatedPaid, invoice.dueDate.toISOString());
+          const updatedStatus = determinePaymentStatus(
+            Number(invoice.totalAmount),
+            updatedPaid,
+            invoice.dueDate.toISOString(),
+          );
 
           await tx.studentInvoice.update({
             where: { id: payment.invoiceId },
@@ -586,9 +656,9 @@ export async function processPaymentReversal(payload: PaymentReversalPayload) {
         data: {
           schoolId,
           transactionNumber: `TXN-REV-${Date.now().toString().slice(-6)}`,
-          accountId: 'acc-main-cash',
-          transactionType: 'DEBIT',
-          category: 'REVERSAL',
+          accountId: "acc-main-cash",
+          transactionType: "DEBIT",
+          category: "REVERSAL",
           amount: payment.amount,
           referenceId: payment.id,
           description: `Reversal of payment ${payment.paymentNumber}: ${reason}`,
@@ -600,15 +670,15 @@ export async function processPaymentReversal(payload: PaymentReversalPayload) {
     await createAuditLog({
       schoolId,
       userId: reversedById,
-      action: 'UPDATE',
-      module: 'PAYMENT_REVERSAL',
+      action: "UPDATE",
+      module: "PAYMENT_REVERSAL",
       details: `Reversed payment ${payment.paymentNumber}. Reason: ${reason}`,
     });
 
     return { success: true, reversalNumber: revNo };
   } catch (err) {
-    console.error('Payment reversal failed:', err);
-    throw new Error('Payment reversal could not be saved.');
+    console.error("Payment reversal failed:", err);
+    throw new Error("Payment reversal could not be saved.");
   }
 }
 
@@ -621,39 +691,43 @@ export async function getAccountantFeeDashboard(schoolId: string) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const examFeeTypes = await prisma.feeType.findMany({
-    where: { schoolId, category: 'EXAM' },
+    where: { schoolId, category: "EXAM" },
     select: { id: true },
   });
   const examFeeTypeIds = examFeeTypes.map((feeType) => feeType.id);
 
-  const [invoiced, collected, due, examCollected, today, recentReceipts] = await Promise.all([
-    prisma.studentInvoice.aggregate({
-      where: { schoolId, createdAt: { gte: monthStart } },
-      _sum: { totalAmount: true },
-    }),
-    prisma.receipt.aggregate({
-      where: { schoolId, generatedAt: { gte: monthStart } },
-      _sum: { totalPaid: true },
-    }),
-    prisma.studentInvoice.aggregate({
-      where: { schoolId, paymentStatus: { in: ['unpaid', 'partially_paid', 'overdue'] } },
-      _sum: { dueAmount: true },
-    }),
-    prisma.studentInvoice.aggregate({
-      where: { schoolId, feeTypeId: { in: examFeeTypeIds } },
-      _sum: { paidAmount: true },
-    }),
-    prisma.receipt.aggregate({
-      where: { schoolId, generatedAt: { gte: todayStart } },
-      _count: { id: true },
-      _sum: { totalPaid: true },
-    }),
-    prisma.receipt.findMany({
-      where: { schoolId },
-      take: 5,
-      orderBy: { generatedAt: 'desc' },
-    }),
-  ]);
+  const [invoiced, collected, due, examCollected, today, recentReceipts] =
+    await Promise.all([
+      prisma.studentInvoice.aggregate({
+        where: { schoolId, createdAt: { gte: monthStart } },
+        _sum: { totalAmount: true },
+      }),
+      prisma.receipt.aggregate({
+        where: { schoolId, generatedAt: { gte: monthStart } },
+        _sum: { totalPaid: true },
+      }),
+      prisma.studentInvoice.aggregate({
+        where: {
+          schoolId,
+          paymentStatus: { in: ["unpaid", "partially_paid", "overdue"] },
+        },
+        _sum: { dueAmount: true },
+      }),
+      prisma.studentInvoice.aggregate({
+        where: { schoolId, feeTypeId: { in: examFeeTypeIds } },
+        _sum: { paidAmount: true },
+      }),
+      prisma.receipt.aggregate({
+        where: { schoolId, generatedAt: { gte: todayStart } },
+        _count: { id: true },
+        _sum: { totalPaid: true },
+      }),
+      prisma.receipt.findMany({
+        where: { schoolId },
+        take: 5,
+        orderBy: { generatedAt: "desc" },
+      }),
+    ]);
 
   return toClientData({
     currentMonthInvoiced: Number(invoiced._sum.totalAmount ?? 0),
@@ -670,25 +744,63 @@ export async function getAccountantFeeDashboard(schoolId: string) {
 // ADMIT CARD CLEARANCE CHECK
 // -------------------------------------------------------------
 
-export async function checkAdmitCardEligibility(studentId: string, schoolId: string) {
+export async function checkAdmitCardEligibility(
+  studentId: string,
+  schoolId: string,
+) {
   try {
     // Check school setting: require_exam_fee_payment_for_admit_card
     const requireExamFeeSetting = true; // Enabled by default in setting
 
-    const unpaidExamInvoices = await (prisma as any).studentInvoice.findMany({
+    const examTypes = await prisma.feeType.findMany({
+      where: { schoolId, category: "EXAM" },
+      select: { id: true },
+    });
+    const links = await prisma.feeStructureItem.findMany({
+      where: {
+        feeTypeId: { in: examTypes.map((item) => item.id) },
+        feeStructure: { schoolId },
+      },
+      select: { feeStructureId: true },
+    });
+    const namedStructures = await prisma.feeStructure.findMany({
+      where: { schoolId, name: { contains: "Exam" } },
+      select: { id: true },
+    });
+    const structureIds = [
+      ...new Set([
+        ...links.map((item) => item.feeStructureId),
+        ...namedStructures.map((item) => item.id),
+      ]),
+    ];
+    const invoices = await prisma.feeInvoice.findMany({
       where: {
         schoolId,
         studentId,
-        feeTypeId: 'ft-3', // Exam fee
-        dueAmount: { gt: 0 },
+        feeStructureId: { in: structureIds },
+        status: { not: "CANCELLED" },
       },
-      select: { id: true, dueAmount: true },
+      select: { id: true, amount: true, discount: true, paidAmount: true },
     });
+    const unpaidExamInvoices = invoices
+      .map((invoice) => ({
+        id: invoice.id,
+        dueAmount: Math.max(
+          0,
+          Number(invoice.amount) -
+            Number(invoice.discount) -
+            Number(invoice.paidAmount),
+        ),
+      }))
+      .filter((invoice) => invoice.dueAmount > 0);
 
     return canIssueAdmitCard({
       studentId,
       requireExamFeePayment: requireExamFeeSetting,
-      unpaidExamFeeInvoices: unpaidExamInvoices.map((i: any) => ({ id: i.id, dueAmount: Number(i.dueAmount) })),
+      unpaidExamFeeInvoices: unpaidExamInvoices.map((i: any) => ({
+        id: i.id,
+        dueAmount: Number(i.dueAmount),
+      })),
     });
   } catch {
     return { eligible: true };

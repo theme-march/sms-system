@@ -245,6 +245,11 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
         href: "/dashboard/staff/leave",
         permission: PERMISSIONS.EMPLOYEE_PORTAL_VIEW,
       },
+      {
+        label: "My Salary & Payslips",
+        href: "/dashboard/staff/salary",
+        permission: PERMISSIONS.EMPLOYEE_PORTAL_VIEW,
+      },
     ],
   },
 ];
@@ -325,12 +330,32 @@ export function canAccessPermission(
 ) {
   return (
     roles.includes("Super Admin") ||
+    (roles.includes("Teacher") &&
+      permission === PERMISSIONS.EMPLOYEE_PORTAL_VIEW) ||
     permissions.includes("ALL") ||
     permissions.includes(permission)
   );
 }
 
 export function defaultLandingPage(permissions: string[], roles: string[]) {
+  const managementRoles = [
+    "Super Admin",
+    "School Admin",
+    "Academic Admin",
+    "Admission Officer",
+    "Accountant",
+    "HR Manager",
+  ];
+  const isTeacherOnly =
+    roles.includes("Teacher") &&
+    !roles.some((role) => managementRoles.includes(role));
+  if (isTeacherOnly && permissions.includes(PERMISSIONS.TEACHER_PORTAL_VIEW))
+    return "/teacher";
+  const isStudentOnly =
+    roles.includes("Student") &&
+    !roles.some((role) => managementRoles.includes(role));
+  if (isStudentOnly && permissions.includes(PERMISSIONS.STUDENT_PORTAL_VIEW))
+    return "/student";
   if (
     roles.includes("Super Admin") ||
     permissions.includes(PERMISSIONS.DASHBOARD_VIEW)
