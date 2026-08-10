@@ -205,7 +205,7 @@ export function CustomPagesManager() {
     setSaving(true);
     setSaved(false);
     try {
-      const response = await fetch("/api/website", {
+      const response = await fetch("/api/website?section=custom-pages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(content),

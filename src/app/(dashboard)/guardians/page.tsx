@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { Users, Search, Eye, Phone, ShieldCheck, UserCheck } from 'lucide-react';
 import { PageHeader } from '@/src/components/ui/PageHeader';
 import { getGuardians } from '@/src/services/guardian.service';
+import { TablePagination, usePagination } from '@/src/components/tables/TablePagination';
 
 export default function GuardiansPage() {
   const [guardians, setGuardians] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const pagination = usePagination(guardians);
 
   useEffect(() => {
     async function loadData() {
@@ -64,7 +66,7 @@ export default function GuardiansPage() {
                   </td>
                 </tr>
               ) : guardians.length > 0 ? (
-                guardians.map((g) => (
+                pagination.pageItems.map((g) => (
                   <tr key={g.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
                       <p className="font-bold text-slate-900">{g.name}</p>
@@ -116,6 +118,7 @@ export default function GuardiansPage() {
             </tbody>
           </table>
         </div>
+        {!loading && <TablePagination {...pagination} />}
       </div>
     </div>
   );

@@ -1,10 +1,16 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/src/components/layout/Sidebar";
 import { Header } from "@/src/components/layout/Header";
 import type { WebsiteContent } from "@/src/lib/website-content";
 import { websiteThemeStyle } from "@/src/lib/website-theme";
+import {
+  canAccessPermission,
+  defaultLandingPage,
+  requiredPermissionForPath,
+} from "@/src/config/access-control";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -35,6 +41,20 @@ export function DashboardLayout({
   theme,
 }: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const requiredPermission = requiredPermissionForPath(pathname);
+  const canAccessRoute =
+    !requiredPermission ||
+    canAccessPermission(permissions, roles, requiredPermission);
+
+  useEffect(() => {
+    if (!canAccessRoute) {
+      router.replace(defaultLandingPage(permissions, roles));
+    }
+  }, [canAccessRoute, permissions, roles, router]);
+
+  if (!canAccessRoute) return null;
 
   return (
     <SchoolContext.Provider value={{ schoolId }}>

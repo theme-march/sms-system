@@ -65,7 +65,7 @@ export async function getDashboardAnalytics() {
     prisma.exam.findMany({ where: { schoolId, endDate: { gte: today } }, orderBy: { startDate: 'asc' }, take: 5 }),
     prisma.admissionApplication.count({ where: { schoolId, status: { in: ['submitted', 'under_review', 'correction_requested', 'waiting_list'] } } }),
     prisma.leaveApplication.count({ where: { schoolId, status: 'PENDING' } }),
-    prisma.auditLog.findMany({ where: { schoolId }, orderBy: { createdAt: 'desc' }, take: 10 }),
+    prisma.auditLog.findMany({ where: { schoolId }, orderBy: { createdAt: 'desc' }, take: 5 }),
   ]);
 
   return toClientData({

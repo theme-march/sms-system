@@ -8,6 +8,7 @@ import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { getStudents } from '@/src/services/student.service';
 import { exportToExcel } from '@/src/lib/export';
 import { generatePDF } from '@/src/lib/pdf';
+import { TablePagination, usePagination } from '@/src/components/tables/TablePagination';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<any[]>([]);
@@ -17,6 +18,7 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const pagination = usePagination(students);
 
   useEffect(() => {
     async function loadData() {
@@ -161,7 +163,7 @@ export default function StudentsPage() {
                   </td>
                 </tr>
               ) : students.length > 0 ? (
-                students.map((s) => (
+                pagination.pageItems.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3">
                       <p className="font-bold text-teal-700">{s.admissionNumber || s.studentId}</p>
@@ -211,6 +213,7 @@ export default function StudentsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && <TablePagination {...pagination} />}
       </div>
     </div>
   );

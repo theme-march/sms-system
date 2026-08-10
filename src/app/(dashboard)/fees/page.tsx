@@ -19,11 +19,13 @@ import {
 import { PageHeader } from "@/src/components/ui/PageHeader";
 import { DatabaseEmptyState } from "@/src/components/ui/DatabaseEmptyState";
 import { formatCurrency } from "@/src/lib/utils";
+import { TablePagination, usePagination } from "@/src/components/tables/TablePagination";
 
 type Tab = "invoices" | "structures" | "collections";
 type Data = any;
 const emptyData = {
   canManage: false,
+  canCollect: false,
   structures: [],
   invoices: [],
   students: [],
@@ -126,6 +128,8 @@ export default function FeesPage() {
       ),
     [data.structures],
   );
+  const invoicePagination = usePagination<any>(filtered);
+  const paymentPagination = usePagination<any>(data.payments);
 
   async function submit(body: object, success: string) {
     setBusy(true);
@@ -360,7 +364,7 @@ export default function FeesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((item: any) => (
+                  {invoicePagination.pageItems.map((item: any) => (
                     <tr key={item.id}>
                       <td>
                         <p className="font-mono font-semibold text-slate-800">
@@ -410,7 +414,7 @@ export default function FeesPage() {
                         <Badge status={item.status} />
                       </td>
                       <td className="print:hidden">
-                        {data.canManage &&
+                        {data.canCollect &&
                           item.dueAmount > 0 &&
                           item.status !== "CANCELLED" && (
                             <button
@@ -437,6 +441,7 @@ export default function FeesPage() {
               </table>
             </div>
           )}
+          {!loading && <TablePagination {...invoicePagination} className="print:hidden" />}
         </section>
       )}
 
@@ -542,7 +547,7 @@ export default function FeesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.payments.map((item: any) => (
+                  {paymentPagination.pageItems.map((item: any) => (
                     <tr key={item.id}>
                       <td className="font-mono font-semibold">
                         {item.receiptNumber}
@@ -572,6 +577,7 @@ export default function FeesPage() {
               </table>
             </div>
           )}
+          <TablePagination {...paymentPagination} className="print:hidden" />
         </section>
       )}
 

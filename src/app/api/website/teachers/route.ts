@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/src/lib/db/prisma';
-import { requirePermission, authorizationStatus } from '@/src/lib/auth/authorize';
+import { requireAnyPermission, authorizationStatus } from '@/src/lib/auth/authorize';
 import { PERMISSIONS } from '@/src/config/permissions';
 import { defaultWebsiteContent, normalizeWebsiteContent } from '@/src/lib/website-content';
 
 export async function GET() {
   try {
-    const session = await requirePermission(PERMISSIONS.SCHOOL_SETTINGS_MANAGE);
+    const session = await requireAnyPermission([PERMISSIONS.WEBSITE_TEACHERS_MANAGE, PERMISSIONS.SCHOOL_SETTINGS_MANAGE]);
     if (!session.schoolId) return NextResponse.json([]);
     const teachers = await prisma.teacher.findMany({
       where: { schoolId: session.schoolId, status: 'ACTIVE' },
@@ -30,7 +30,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await requirePermission(PERMISSIONS.SCHOOL_SETTINGS_MANAGE);
+    const session = await requireAnyPermission([PERMISSIONS.WEBSITE_TEACHERS_MANAGE, PERMISSIONS.SCHOOL_SETTINGS_MANAGE]);
     if (!session.schoolId) return NextResponse.json({ error: 'School not found.' }, { status: 404 });
     const body = await request.json();
     const requestedIds = Array.isArray(body.teacherIds) ? body.teacherIds.filter((id: unknown): id is string => typeof id === 'string') : [];

@@ -169,19 +169,19 @@ export default async function StudentPortalDashboard() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-r from-teal-800 via-teal-700 to-slate-900 text-white shadow-sm">
+      <section className="dashboard-hero overflow-hidden rounded-2xl text-white shadow-sm">
         <div className="flex flex-col justify-between gap-5 p-6 sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-xl font-black text-teal-100">{initials || "S"}</div>
+            <div className="dashboard-hero-panel flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border text-xl font-black">{initials || "S"}</div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-200">Personal Student Dashboard</p>
+              <p className="dashboard-hero-muted text-[10px] font-bold uppercase tracking-[0.2em]">Personal Student Dashboard</p>
               <h1 className="mt-1 text-xl font-black sm:text-2xl">Welcome, {student.nameEn}</h1>
-              <p className="mt-1 text-xs text-teal-100">{className} · {sectionName} · Roll {rollNumber ?? "Not assigned"} · {student.studentCode}</p>
+              <p className="dashboard-hero-muted mt-1 text-xs">{className} · {sectionName} · Roll {rollNumber ?? "Not assigned"} · {student.studentCode}</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Link href="/student/profile" className="rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/20">My Profile</Link>
-            <div className="rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-xs"><span className="block text-[9px] uppercase text-teal-200">Academic year</span><strong>{enrollment?.academicYear.name ?? "Not assigned"}</strong></div>
+            <Link href="/student/profile" className="dashboard-hero-panel rounded-lg border px-4 py-2.5 text-xs font-bold">My Profile</Link>
+            <div className="dashboard-hero-panel rounded-lg border px-4 py-2.5 text-xs"><span className="dashboard-hero-muted block text-[9px] uppercase">Academic year</span><strong>{enrollment?.academicYear.name ?? "Not assigned"}</strong></div>
           </div>
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
@@ -249,7 +249,7 @@ export default async function StudentPortalDashboard() {
 function Metric({ icon: Icon, label, value, detail }: { icon: typeof BookOpen; label: string; value: string; detail: string }) {
   return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs"><div className="flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-2 truncate text-xl font-black text-slate-900">{value}</p></div><span className="rounded-lg bg-teal-50 p-2 text-teal-700"><Icon className="h-4 w-4" /></span></div><p className="mt-2 text-[11px] text-slate-500">{detail}</p></section>;
 }
-function HeroDetail({ label, value }: { label: string; value: string }) { return <div className="border-white/10 px-5 py-4 sm:border-r"><p className="text-[9px] font-bold uppercase tracking-wider text-teal-200">{label}</p><p className="mt-0.5 truncate text-xs font-semibold text-white">{value}</p></div>; }
+function HeroDetail({ label, value }: { label: string; value: string }) { return <div className="border-white/10 px-5 py-4 sm:border-r"><p className="dashboard-hero-muted text-[9px] font-bold uppercase tracking-wider">{label}</p><p className="mt-0.5 truncate text-xs font-semibold text-white">{value}</p></div>; }
 function SectionTitle({ icon: Icon, title, detail }: { icon: typeof BookOpen; title: string; detail: string }) { return <div><h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><Icon className="h-4 w-4 text-teal-600" />{title}</h2><p className="mt-1 text-xs text-slate-500">{detail}</p></div>; }
 function Empty({ text }: { text: string }) { return <p className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-7 text-center text-xs text-slate-500">{text}</p>; }
 function QuickLink({ href, icon: Icon, title }: { href: string; icon: typeof BookOpen; title: string }) { return <Link href={href} className="group flex items-center gap-3 rounded-xl border border-slate-200 p-3 hover:border-teal-200 hover:bg-teal-50/50"><Icon className="h-4 w-4 text-teal-700" /><span className="flex-1 text-xs font-bold text-slate-800">{title}</span><ArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-teal-600" /></Link>; }

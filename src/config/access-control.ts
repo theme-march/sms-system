@@ -1,4 +1,4 @@
-import { PERMISSIONS, type PermissionCode } from "@/src/config/permissions";
+import { PERMISSIONS, WEBSITE_PERMISSIONS, type PermissionCode } from "@/src/config/permissions";
 
 export type NavigationItem = {
   label: string;
@@ -43,77 +43,77 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
       {
         label: "Website Overview",
         href: "/dashboard/website-settings",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_OVERVIEW_MANAGE,
       },
       {
         label: "Custom Pages",
         href: "/dashboard/website-settings/custom-pages",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_CUSTOM_PAGES_MANAGE,
       },
       {
         label: "Banner Slider",
         href: "/dashboard/website-settings/banners",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_BANNERS_MANAGE,
       },
       {
         label: "Home Page",
         href: "/dashboard/website-settings/home",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_HOME_MANAGE,
       },
       {
         label: "About Page",
         href: "/dashboard/website-settings/about",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_ABOUT_MANAGE,
       },
       {
         label: "Academics Page",
         href: "/dashboard/website-settings/academic-activities",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_ACADEMICS_MANAGE,
       },
       {
         label: "Programs Page",
         href: "/dashboard/website-settings/programs",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_PROGRAMS_MANAGE,
       },
       {
         label: "Gallery Page",
         href: "/dashboard/website-settings/gallery",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_GALLERY_MANAGE,
       },
       {
         label: "Events Page",
         href: "/dashboard/website-settings/events",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_EVENTS_MANAGE,
       },
       {
         label: "Admission Page",
         href: "/dashboard/website-settings/admission-information",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_ADMISSION_MANAGE,
       },
       {
         label: "Teachers Page",
         href: "/dashboard/website-settings/our-teachers",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_TEACHERS_MANAGE,
       },
       {
         label: "Facilities Page",
         href: "/dashboard/website-settings/facilities",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_FACILITIES_MANAGE,
       },
       {
         label: "Achievements Page",
         href: "/dashboard/website-settings/achievements",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_ACHIEVEMENTS_MANAGE,
       },
       {
         label: "Downloads Page",
         href: "/dashboard/website-settings/downloads",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_DOWNLOADS_MANAGE,
       },
       {
         label: "Contact Page",
         href: "/dashboard/website-settings/contact",
-        permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
+        permission: PERMISSIONS.WEBSITE_CONTACT_MANAGE,
       },
     ],
   },
@@ -256,10 +256,21 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
 
 const ROUTE_RULES: Array<{ prefixes: string[]; permission: PermissionCode }> = [
   { prefixes: ["/settings"], permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE },
-  {
-    prefixes: ["/website-settings"],
-    permission: PERMISSIONS.SCHOOL_SETTINGS_MANAGE,
-  },
+  { prefixes: ["/website-settings/custom-pages"], permission: PERMISSIONS.WEBSITE_CUSTOM_PAGES_MANAGE },
+  { prefixes: ["/website-settings/banners"], permission: PERMISSIONS.WEBSITE_BANNERS_MANAGE },
+  { prefixes: ["/website-settings/home"], permission: PERMISSIONS.WEBSITE_HOME_MANAGE },
+  { prefixes: ["/website-settings/about"], permission: PERMISSIONS.WEBSITE_ABOUT_MANAGE },
+  { prefixes: ["/website-settings/academic-activities"], permission: PERMISSIONS.WEBSITE_ACADEMICS_MANAGE },
+  { prefixes: ["/website-settings/programs"], permission: PERMISSIONS.WEBSITE_PROGRAMS_MANAGE },
+  { prefixes: ["/website-settings/gallery"], permission: PERMISSIONS.WEBSITE_GALLERY_MANAGE },
+  { prefixes: ["/website-settings/events"], permission: PERMISSIONS.WEBSITE_EVENTS_MANAGE },
+  { prefixes: ["/website-settings/admission-information"], permission: PERMISSIONS.WEBSITE_ADMISSION_MANAGE },
+  { prefixes: ["/website-settings/our-teachers"], permission: PERMISSIONS.WEBSITE_TEACHERS_MANAGE },
+  { prefixes: ["/website-settings/facilities"], permission: PERMISSIONS.WEBSITE_FACILITIES_MANAGE },
+  { prefixes: ["/website-settings/achievements"], permission: PERMISSIONS.WEBSITE_ACHIEVEMENTS_MANAGE },
+  { prefixes: ["/website-settings/downloads"], permission: PERMISSIONS.WEBSITE_DOWNLOADS_MANAGE },
+  { prefixes: ["/website-settings/contact"], permission: PERMISSIONS.WEBSITE_CONTACT_MANAGE },
+  { prefixes: ["/website-settings"], permission: PERMISSIONS.WEBSITE_OVERVIEW_MANAGE },
   { prefixes: ["/users"], permission: PERMISSIONS.USERS_VIEW },
   { prefixes: ["/roles"], permission: PERMISSIONS.ROLES_VIEW },
   { prefixes: ["/academics"], permission: PERMISSIONS.ACADEMIC_VIEW },
@@ -367,5 +378,7 @@ export function defaultLandingPage(permissions: string[], roles: string[]) {
     return "/guardian";
   if (permissions.includes(PERMISSIONS.EMPLOYEE_PORTAL_VIEW))
     return "/staff/leave";
+  if (WEBSITE_PERMISSIONS.some((permission) => permissions.includes(permission)))
+    return "/website-settings";
   return "/unauthorized";
 }

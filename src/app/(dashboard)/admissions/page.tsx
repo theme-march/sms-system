@@ -26,12 +26,14 @@ import {
   approveAdmissionApplicationTransaction,
   createAdmissionCampaign,
 } from '@/src/services/admission.service';
+import { TablePagination, usePagination } from '@/src/components/tables/TablePagination';
 
 export default function AdmissionOfficerDashboard() {
   const [activeTab, setActiveTab] = useState<'applications' | 'campaigns'>('applications');
   const [applications, setApplications] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const applicationPagination = usePagination(applications);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -275,7 +277,7 @@ export default function AdmissionOfficerDashboard() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {applications.length > 0 ? (
-                  applications.map((app) => (
+                  applicationPagination.pageItems.map((app) => (
                     <tr key={app.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-3">
                         <p className="font-bold text-teal-700">{app.applicationNumber}</p>
@@ -316,6 +318,7 @@ export default function AdmissionOfficerDashboard() {
               </tbody>
             </table>
           </div>
+          <TablePagination {...applicationPagination} />
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/src/lib/db/prisma";
 import {
   requirePermission,
+  requireAnyPermission,
   authorizationStatus,
 } from "@/src/lib/auth/authorize";
 import { PERMISSIONS } from "@/src/config/permissions";
@@ -346,6 +347,9 @@ export async function GET() {
         canManage:
           session.roles.includes("Super Admin") ||
           session.permissions.includes(PERMISSIONS.FEES_MANAGE),
+        canCollect:
+          session.roles.includes("Super Admin") ||
+          session.permissions.includes(PERMISSIONS.PAYMENTS_COLLECT),
         feeTypes,
         structures,
         invoices: normalizedInvoices,
@@ -374,7 +378,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requirePermission(PERMISSIONS.FEES_MANAGE);
+    const session = await requireAnyPermission([
+      PERMISSIONS.FEES_MANAGE,
+      PERMISSIONS.PAYMENTS_COLLECT,
+    ]);
     const parsed = requestSchema.safeParse(await request.json());
     if (!parsed.success)
       return NextResponse.json(
@@ -382,6 +389,17 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     const input = parsed.data;
+    const isSuperAdmin = session.roles.includes("Super Admin");
+    const canManageFees =
+      isSuperAdmin || session.permissions.includes(PERMISSIONS.FEES_MANAGE);
+    const canCollectPayments =
+      isSuperAdmin ||
+      session.permissions.includes(PERMISSIONS.PAYMENTS_COLLECT);
+    if (input.action === "recordPayment") {
+      if (!canCollectPayments) throw new Error("FORBIDDEN");
+    } else if (!canManageFees) {
+      throw new Error("FORBIDDEN");
+    }
     if (input.action === "createStructure") {
       const duplicate = await prisma.feeStructure.findFirst({
         where: {

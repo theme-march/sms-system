@@ -90,7 +90,7 @@ export function WebsiteSectionEditor({ section }: { section: string }) {
     try {
       const teacherSelectionOnly = section === "our-teachers";
       const r = await fetch(
-        teacherSelectionOnly ? "/api/website/teachers" : "/api/website",
+        teacherSelectionOnly ? "/api/website/teachers" : `/api/website?section=${encodeURIComponent(section)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

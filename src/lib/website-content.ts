@@ -65,6 +65,24 @@ export type WebsiteContent = {
   };
 };
 
+export function getPortalDownloads(
+  downloads: WebsiteContent["downloads"],
+  classId?: string | null,
+  sectionId?: string | null,
+) {
+  return downloads.filter((item) => {
+    if (
+      !item.title.trim() ||
+      !(item.fileUrl.startsWith("/") || /^https?:\/\//i.test(item.fileUrl))
+    ) {
+      return false;
+    }
+    if (item.classId && item.classId !== classId) return false;
+    if (item.sectionId && item.sectionId !== sectionId) return false;
+    return true;
+  });
+}
+
 export const defaultWebsiteContent: WebsiteContent = {
   tagline: "জ্ঞান, শৃঙ্খলা ও মানবিকতায় আগামীর পথচলা",
   bannerImage: "/school-hero-v2.png",

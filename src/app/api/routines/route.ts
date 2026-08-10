@@ -86,9 +86,21 @@ async function options(schoolId: string) {
 export async function GET(request: NextRequest) {
   try {
     const session = await requirePermission(PERMISSIONS.ROUTINES_VIEW);
+    const managementRoles = ['Super Admin', 'School Admin', 'Academic Admin'];
+    const isTeacherScope =
+      session.roles.includes('Teacher') &&
+      !session.roles.some((role) => managementRoles.includes(role));
+    const teacherProfile = isTeacherScope
+      ? await prisma.teacher.findFirst({
+          where: { userId: session.id, schoolId: session.schoolId, status: 'ACTIVE' },
+          select: { id: true },
+        })
+      : null;
     const classId = request.nextUrl.searchParams.get('classId') || '';
     const sectionId = request.nextUrl.searchParams.get('sectionId') || '';
-    const teacherId = request.nextUrl.searchParams.get('teacherId') || '';
+    const teacherId = isTeacherScope
+      ? teacherProfile?.id || '__unlinked_teacher__'
+      : request.nextUrl.searchParams.get('teacherId') || '';
     const weekday = request.nextUrl.searchParams.get('weekday') || '';
     const status = request.nextUrl.searchParams.get('status') || '';
     const [records, lookup] = await Promise.all([
@@ -102,9 +114,23 @@ export async function GET(request: NextRequest) {
     const roomMap = new Map(lookup.rooms.map((item) => [item.id, item]));
     const periodMap = new Map(lookup.periods.map((item) => [item.id, item]));
     const groupMap = new Map(lookup.classGroups.map((item) => [item.groupId, item.groupName]));
+    const visibleClassIds = new Set(records.map((item) => item.classId));
+    const visibleSubjectIds = new Set(records.map((item) => item.subjectId));
+    const visibleLookup = isTeacherScope
+      ? {
+          ...lookup,
+          classes: lookup.classes.filter((item) => visibleClassIds.has(item.id)),
+          classGroups: lookup.classGroups.filter((item) => visibleClassIds.has(item.classId)),
+          classSubjects: lookup.classSubjects.filter(
+            (item) => visibleClassIds.has(item.classId) && visibleSubjectIds.has(item.subjectId),
+          ),
+          teachers: lookup.teachers.filter((item) => item.id === teacherProfile?.id),
+        }
+      : lookup;
     return NextResponse.json({
-      ...lookup,
-      canManage: session.roles.includes('Super Admin') || session.permissions.includes(PERMISSIONS.ROUTINES_MANAGE),
+      ...visibleLookup,
+      isTeacherScope,
+      canManage: !isTeacherScope && (session.roles.includes('Super Admin') || session.permissions.includes(PERMISSIONS.ROUTINES_MANAGE)),
       data: records.map((item) => ({ ...item, effectiveFrom: item.effectiveFrom.toISOString().slice(0, 10), effectiveTo: item.effectiveTo?.toISOString().slice(0, 10) || '', className: classMap.get(item.classId) || '—', sectionName: sectionMap.get(item.sectionId) || '—', groupName: item.groupId ? groupMap.get(item.groupId) || '—' : '', subjectName: subjectMap.get(item.subjectId)?.subjectName || '—', subjectCode: subjectMap.get(item.subjectId)?.subjectCode || '', teacherName: teacherMap.get(item.teacherId)?.nameEn || '—', teacherCode: teacherMap.get(item.teacherId)?.employeeCode || '', roomName: item.roomId ? roomMap.get(item.roomId)?.name || '—' : '—', periodName: periodMap.get(item.periodId)?.name || '—' })),
     });
   } catch (error) {

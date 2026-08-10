@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import {
-  requirePermission,
+  requireAnyPermission,
   authorizationStatus,
 } from "@/src/lib/auth/authorize";
-import { PERMISSIONS } from "@/src/config/permissions";
+import { PERMISSIONS, WEBSITE_PERMISSIONS } from "@/src/config/permissions";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -19,7 +19,7 @@ const allowed = new Set([
 ]);
 export async function POST(request: Request) {
   try {
-    await requirePermission(PERMISSIONS.SCHOOL_SETTINGS_MANAGE);
+    await requireAnyPermission([...WEBSITE_PERMISSIONS, PERMISSIONS.SCHOOL_SETTINGS_MANAGE]);
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File) || !file.size)

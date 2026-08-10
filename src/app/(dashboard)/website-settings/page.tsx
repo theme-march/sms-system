@@ -252,7 +252,7 @@ export default function WebsiteSettingsPage() {
     setSaving(true);
     setSaved(false);
     try {
-      const response = await fetch("/api/website", {
+      const response = await fetch("/api/website?section=overview", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(content),

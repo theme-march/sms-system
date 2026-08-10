@@ -432,7 +432,8 @@ export function StaffLeaveSystem({
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {data.balances.map((item: any) => (
-              <article key={item.id} className="rounded-xl border bg-white p-5">
+              <article key={item.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="absolute inset-x-0 top-0 h-1 bg-teal-600" />
                 <div className="flex justify-between">
                   <h3 className="font-bold">{item.name}</h3>
                   <Badge value={item.isPaid ? "PAID" : "UNPAID"} />
@@ -674,7 +675,7 @@ function SalaryPanel({ data }: { data: any }) {
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col justify-between gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-red-700">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">
                 Current salary assignment
               </p>
               <h2 className="mt-1 text-lg font-black text-slate-900">
@@ -715,8 +716,8 @@ function SalaryPanel({ data }: { data: any }) {
                 </div>
               ))}
             </div>
-            <div className="rounded-xl bg-slate-900 p-5 text-white">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="dashboard-hero rounded-xl p-5 text-white shadow-sm">
+              <p className="dashboard-hero-muted text-[10px] font-bold uppercase tracking-wider">
                 Estimated monthly salary
               </p>
               <p className="mt-3 text-2xl font-black">
@@ -726,15 +727,15 @@ function SalaryPanel({ data }: { data: any }) {
               </p>
               <div className="mt-5 space-y-2 border-t border-white/10 pt-4 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Earnings</span>
+                  <span className="dashboard-hero-muted">Earnings</span>
                   <b>{formatCurrency(current.estimatedEarnings)}</b>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Deductions</span>
+                  <span className="dashboard-hero-muted">Deductions</span>
                   <b>{formatCurrency(current.estimatedDeductions)}</b>
                 </div>
               </div>
-              <p className="mt-4 text-[10px] leading-relaxed text-slate-400">
+              <p className="dashboard-hero-muted mt-4 text-[10px] leading-relaxed">
                 Final salary may change after attendance, overtime, bonus, tax
                 and adjustments are calculated.
               </p>
@@ -931,12 +932,14 @@ function SalaryPanel({ data }: { data: any }) {
 
 function SalaryMetric({ icon: Icon, label, value }: any) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex justify-between">
         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
           {label}
         </p>
-        <Icon className="h-4 w-4 text-red-700" />
+        <span className="rounded-lg bg-teal-50 p-2 text-teal-700">
+          <Icon className="h-4 w-4" />
+        </span>
       </div>
       <p className="mt-2 text-xl font-black">
         {formatCurrency(Number(value || 0))}
@@ -962,12 +965,12 @@ function salaryMonth(value: number) {
 
 function Tabs({ tab, setTab, items }: any) {
   return (
-    <nav className="flex gap-1 rounded-xl border bg-white p-1.5">
+    <nav className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
       {items.map((item: any) => (
         <button
           key={item[0]}
           onClick={() => setTab(item[0])}
-          className={`rounded-lg px-4 py-2.5 text-xs font-bold ${tab === item[0] ? "bg-teal-600 text-white" : "text-slate-600"}`}
+          className={`rounded-lg px-4 py-2.5 text-xs font-bold transition-colors ${tab === item[0] ? "bg-teal-600 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-teal-700"}`}
         >
           {item[1]}
         </button>
@@ -977,7 +980,7 @@ function Tabs({ tab, setTab, items }: any) {
 }
 function Stat({ label, value, icon: Icon }: any) {
   return (
-    <div className="rounded-xl border bg-white p-5">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex justify-between">
         <span className="text-xs text-slate-500">{label}</span>
         <Icon className="h-4 w-4 text-teal-600" />

@@ -176,25 +176,25 @@ export default async function TeacherPortalDashboard() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-r from-teal-800 via-teal-700 to-slate-900 text-white shadow-sm">
+      <section className="dashboard-hero overflow-hidden rounded-2xl text-white shadow-sm">
         <div className="flex flex-col justify-between gap-5 p-6 sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-xl font-black text-teal-100">
+            <div className="dashboard-hero-panel flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border text-xl font-black">
               {initials || "T"}
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-200">
+              <p className="dashboard-hero-muted text-[10px] font-bold uppercase tracking-[0.2em]">
                 Personal Teacher Dashboard
               </p>
               <h1 className="mt-1 text-xl font-black sm:text-2xl">Welcome, {teacher.nameEn}</h1>
-              <p className="mt-1 text-xs text-teal-100">
+              <p className="dashboard-hero-muted mt-1 text-xs">
                 {teacher.designation?.nameEn || "Teacher"} · {teacher.department?.nameEn || "Academic Department"} · {teacher.school.name}
               </p>
             </div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-xs">
+          <div className="dashboard-hero-panel rounded-xl border px-4 py-3 text-xs">
             <p className="font-bold text-white">Employee ID: {teacher.employeeCode}</p>
-            <p className="mt-1 text-teal-100">Today: {displayDate(now)}</p>
+            <p className="dashboard-hero-muted mt-1">Today: {displayDate(now)}</p>
           </div>
         </div>
         <div className="grid border-t border-white/10 bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
@@ -353,7 +353,7 @@ function Metric({ icon: Icon, label, value, detail }: { icon: typeof BookOpen; l
 }
 
 function ProfileDetail({ icon: Icon, label, value }: { icon: typeof BookOpen; label: string; value: string }) {
-  return <div className="flex items-center gap-3 border-white/10 px-5 py-4 sm:border-r"><Icon className="h-4 w-4 shrink-0 text-teal-300" /><div className="min-w-0"><p className="text-[9px] font-bold uppercase tracking-wider text-teal-200">{label}</p><p className="mt-0.5 truncate text-xs font-semibold capitalize text-white">{value}</p></div></div>;
+  return <div className="flex items-center gap-3 border-white/10 px-5 py-4 sm:border-r"><Icon className="dashboard-hero-muted h-4 w-4 shrink-0" /><div className="min-w-0"><p className="dashboard-hero-muted text-[9px] font-bold uppercase tracking-wider">{label}</p><p className="mt-0.5 truncate text-xs font-semibold capitalize text-white">{value}</p></div></div>;
 }
 
 function QuickAction({ href, icon: Icon, title, description }: { href: string; icon: typeof BookOpen; title: string; description: string }) {

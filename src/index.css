@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
 @layer components {
+  .scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
   .btn-primary {
     @apply inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-teal-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none;
   }
@@ -106,6 +115,36 @@
 .dashboard-theme .dashboard-main h2,
 .dashboard-theme .dashboard-main h3 {
   color: #29261f;
+}
+
+.dashboard-theme .dashboard-hero {
+  color: #ffffff !important;
+  background: linear-gradient(
+    115deg,
+    var(--dashboard-primary-dark) 0%,
+    color-mix(in srgb, var(--dashboard-primary) 68%, #29261f) 58%,
+    #29261f 100%
+  ) !important;
+}
+
+.dashboard-theme .dashboard-main .dashboard-hero h1,
+.dashboard-theme .dashboard-main .dashboard-hero h2,
+.dashboard-theme .dashboard-main .dashboard-hero h3 {
+  color: #ffffff !important;
+}
+
+.dashboard-theme .dashboard-hero-muted {
+  color: color-mix(in srgb, #ffffff 78%, var(--dashboard-primary)) !important;
+}
+
+.dashboard-theme .dashboard-hero-panel {
+  border-color: rgb(255 255 255 / 18%) !important;
+  background: rgb(255 255 255 / 11%) !important;
+  color: #ffffff !important;
+}
+
+.dashboard-theme .dashboard-hero-panel:hover {
+  background: rgb(255 255 255 / 18%) !important;
 }
 
 .dashboard-theme .dashboard-header {

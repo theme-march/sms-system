@@ -36,6 +36,7 @@ export function PortalFees({ studentId, studentName }: { studentId: string; stud
   const totalBill = totalFee - totalDiscount;
   const totalPaid = invoices.reduce((sum, item) => sum + item.paidAmount, 0);
   const balance = totalBill - totalPaid;
+  const amountToPay = Math.max(0, balance);
   const nextDue = invoices.find((item) => item.dueAmount > 0 && item.status !== "CANCELLED");
   const payments = useMemo(() => invoices.flatMap((invoice) => invoice.payments.map((payment) => ({ invoice, payment }))).sort((a, b) => new Date(b.payment.paidAt).getTime() - new Date(a.payment.paidAt).getTime()), [invoices]);
 
@@ -84,7 +85,7 @@ export function PortalFees({ studentId, studentName }: { studentId: string; stud
       </section>
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-black text-slate-900">Amount to Pay</h2>
-        <input aria-label="Amount to pay" type="number" readOnly value={nextDue ? nextDue.dueAmount : 0} className="form-input mt-3 text-lg font-bold" />
+        <input aria-label="Amount to pay" type="number" readOnly value={amountToPay} className="form-input mt-3 text-lg font-bold" />
         {nextDue ? <button type="button" onClick={() => openPayment(nextDue)} className="btn-primary mt-3 w-full justify-center"><CreditCard className="h-4 w-4" />Pay {nextDue.invoiceNumber}</button> : <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-center text-xs font-bold text-emerald-700">All assigned fees are paid</p>}
       </section>
     </div>

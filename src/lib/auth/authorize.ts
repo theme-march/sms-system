@@ -12,6 +12,17 @@ export async function requirePermission(permission: PermissionCode) {
   return { ...session, schoolId: session.schoolId };
 }
 
+export async function requireAnyPermission(permissions: readonly PermissionCode[]) {
+  const session = await getCurrentSession();
+  if (!session) throw new Error('UNAUTHORIZED');
+  const allowed = session.roles.includes('Super Admin')
+    || session.permissions.includes('ALL')
+    || permissions.some((permission) => session.permissions.includes(permission));
+  if (!allowed) throw new Error('FORBIDDEN');
+  if (!session.schoolId) throw new Error('SCHOOL_CONTEXT_REQUIRED');
+  return { ...session, schoolId: session.schoolId };
+}
+
 export function authorizationStatus(error: unknown) {
   const message = error instanceof Error ? error.message : '';
   if (message === 'UNAUTHORIZED') return 401;

@@ -20,6 +20,7 @@ import {
 import { PageHeader } from "@/src/components/ui/PageHeader";
 import { DatabaseEmptyState } from "@/src/components/ui/DatabaseEmptyState";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
+import { TablePagination, usePagination } from "@/src/components/tables/TablePagination";
 
 type Tab = "overview" | "setup" | "routine" | "marks" | "results";
 type Data = any;
@@ -44,6 +45,9 @@ const today = new Date().toLocaleDateString("en-CA", {
 
 export default function ExaminationsPage() {
   const [data, setData] = useState<Data>(emptyData);
+  const routinePagination = usePagination<any>(data.routines);
+  const rosterPagination = usePagination<any>(data.roster);
+  const resultPagination = usePagination<any>(data.results);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
@@ -638,7 +642,7 @@ export default function ExaminationsPage() {
           <section className="card p-5">
             <div className="flex items-center justify-between">
               <Title icon={CalendarDays} text="Official exam routine" />
-              {data.permissions.manage && (
+              {data.permissions.manageRoutines && (
                 <button
                   onClick={() => openRoutine()}
                   disabled={!data.exams.length}
@@ -671,7 +675,7 @@ export default function ExaminationsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.routines.map((row: any) => (
+                    {routinePagination.pageItems.map((row: any) => (
                       <tr key={row.id}>
                         <td className="font-semibold">{row.examName}</td>
                         <td>
@@ -696,6 +700,7 @@ export default function ExaminationsPage() {
                           <StatusBadge status={row.status} />
                         </td>
                         <td className="print:hidden">
+                          {data.permissions.manageRoutines ? <>
                           <button
                             onClick={() => openRoutine(row)}
                             className="icon-edit"
@@ -708,6 +713,7 @@ export default function ExaminationsPage() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
+                          </> : <span className="text-xs text-slate-400">View only</span>}
                         </td>
                       </tr>
                     ))}
@@ -715,6 +721,7 @@ export default function ExaminationsPage() {
                 </table>
               </div>
             )}
+            {!loading && <TablePagination {...routinePagination} className="print:hidden" />}
           </section>
         </>
       )}
@@ -820,7 +827,7 @@ export default function ExaminationsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.roster.map((student: any) => {
+                    {rosterPagination.pageItems.map((student: any) => {
                       const row = markRows[student.studentId] || {
                         marks: "",
                         absent: false,
@@ -899,6 +906,7 @@ export default function ExaminationsPage() {
                 </table>
               </div>
             )}
+            {!loading && <TablePagination {...rosterPagination} className="print:hidden" />}
           </section>
         </>
       )}
@@ -979,7 +987,7 @@ export default function ExaminationsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.results.map((row: any) => (
+                    {resultPagination.pageItems.map((row: any) => (
                       <tr key={row.id}>
                         <td className="font-bold">
                           {row.classPosition || "—"}
@@ -1002,6 +1010,7 @@ export default function ExaminationsPage() {
                 </table>
               </div>
             )}
+            {!loading && <TablePagination {...resultPagination} className="print:hidden" />}
           </section>
         </>
       )}
@@ -1469,6 +1478,7 @@ function FilterBar({
   );
 }
 function ExamTable({ data, canManage, onEdit, onDelete }: any) {
+  const pagination = usePagination<any>(data.exams);
   return (
     <section className="card p-5">
       <div className="flex items-center justify-between">
@@ -1497,7 +1507,7 @@ function ExamTable({ data, canManage, onEdit, onDelete }: any) {
               </tr>
             </thead>
             <tbody>
-              {data.exams.map((exam: any) => (
+              {pagination.pageItems.map((exam: any) => (
                 <tr key={exam.id}>
                   <td className="font-semibold">{exam.name}</td>
                   <td>
@@ -1563,6 +1573,7 @@ function ExamTable({ data, canManage, onEdit, onDelete }: any) {
           </table>
         </div>
       )}
+      <TablePagination {...pagination} className="mt-4 print:hidden" />
     </section>
   );
 }

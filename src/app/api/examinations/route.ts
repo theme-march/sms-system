@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/src/lib/db/prisma";
 import {
   authorizationStatus,
+  requireAnyPermission,
   requirePermission,
 } from "@/src/lib/auth/authorize";
 import { PERMISSIONS } from "@/src/config/permissions";
@@ -563,6 +564,10 @@ export async function GET(request: NextRequest) {
         manage:
           session.roles.includes("Super Admin") ||
           session.permissions.includes(PERMISSIONS.EXAMS_MANAGE),
+        manageRoutines:
+          session.roles.includes("Super Admin") ||
+          session.permissions.includes(PERMISSIONS.EXAMS_MANAGE) ||
+          session.permissions.includes(PERMISSIONS.ROUTINES_MANAGE),
         enterMarks:
           session.roles.includes("Super Admin") ||
           session.permissions.includes(PERMISSIONS.MARKS_ENTER),
@@ -902,7 +907,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     if (action === "saveRoutine") {
-      const session = await requirePermission(PERMISSIONS.EXAMS_MANAGE);
+      const session = await requireAnyPermission([
+        PERMISSIONS.ROUTINES_MANAGE,
+        PERMISSIONS.EXAMS_MANAGE,
+      ]);
       const parsed = routineSchema.parse(body);
       const valid = await Promise.all([
         owns(session.schoolId, "exam", parsed.examId),
@@ -1645,8 +1653,10 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await requirePermission(PERMISSIONS.EXAMS_MANAGE);
     const type = request.nextUrl.searchParams.get("type");
+    const session = type === "routine"
+      ? await requireAnyPermission([PERMISSIONS.ROUTINES_MANAGE, PERMISSIONS.EXAMS_MANAGE])
+      : await requirePermission(PERMISSIONS.EXAMS_MANAGE);
     const id = request.nextUrl.searchParams.get("id") || "";
     if (type === "routine") {
       const row = await prisma.examRoutine.findFirst({

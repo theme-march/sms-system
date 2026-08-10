@@ -159,22 +159,22 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
           <div>
             <h2 className="text-sm font-bold text-slate-900">Recent Activities</h2>
-            <p className="text-xs text-slate-500">Latest audited actions from MySQL</p>
+            <p className="text-[11px] text-slate-500">Latest 5 audited actions from MySQL</p>
           </div>
           <Link href="/dashboard/audit" className="text-xs font-semibold text-teal-600 hover:text-teal-700">View audit log</Link>
         </div>
         <div className="divide-y divide-slate-100">
           {analytics.recentActivities.length ? analytics.recentActivities.map((activity) => (
-            <div key={activity.id} className="flex items-start justify-between gap-4 py-3 text-xs">
-              <div>
+            <div key={activity.id} className="flex items-center justify-between gap-4 py-2 text-[11px]">
+              <div className="min-w-0">
                 <p className="font-semibold text-slate-800">{activity.action} · {activity.module}</p>
-                <p className="mt-0.5 line-clamp-1 text-slate-500">{activity.details || 'No additional details'}</p>
+                <p className="mt-0.5 max-w-4xl truncate text-slate-500">{activity.details || 'No additional details'}</p>
               </div>
-              <time className="shrink-0 text-slate-400">{new Date(activity.createdAt).toLocaleString()}</time>
+              <time className="shrink-0 text-[10px] text-slate-400">{new Date(activity.createdAt).toLocaleString()}</time>
             </div>
           )) : <p className="py-6 text-center text-xs text-slate-400">No recent activity recorded.</p>}
         </div>
@@ -185,15 +185,15 @@ export default async function DashboardPage() {
         {/* Recent Student Admissions Table (2 cols) */}
         <div className="lg:col-span-2 space-y-6">
           {/* Highlight Event Banner */}
-          <div className="bg-teal-800 text-white p-6 rounded-xl shadow-md border-l-4 border-teal-400 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="dashboard-hero flex flex-col justify-between gap-4 rounded-xl border border-white/10 p-6 shadow-md sm:flex-row sm:items-center">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-teal-300 bg-teal-900/60 px-2.5 py-1 rounded">
+              <span className="dashboard-hero-panel dashboard-hero-muted inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest">
                 Upcoming Academic Event
               </span>
               <h3 className="text-base font-bold text-white mt-2">
                 {upcomingExam?.name || 'No upcoming examination scheduled'}
               </h3>
-              <p className="text-xs text-teal-100 mt-1">
+              <p className="dashboard-hero-muted mt-1 text-xs">
                 {upcomingExam
                   ? `${upcomingExam.term} · ${upcomingExam.startDate.toLocaleDateString()}–${upcomingExam.endDate.toLocaleDateString()}`
                   : 'Create an examination schedule from the Exams module.'}
@@ -201,7 +201,7 @@ export default async function DashboardPage() {
             </div>
             <Link
               href="/dashboard/exams"
-              className="px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-900 text-xs font-bold rounded-lg transition-colors whitespace-nowrap self-start sm:self-center shrink-0"
+              className="dashboard-hero-panel inline-flex shrink-0 self-start whitespace-nowrap rounded-lg border px-4 py-2 text-xs font-bold text-white transition sm:self-center"
             >
               View Routine
             </Link>

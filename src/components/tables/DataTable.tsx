@@ -1,5 +1,6 @@
 import React from 'react';
 import { EmptyState } from '@/src/components/ui/EmptyState';
+import { TablePagination, usePagination } from '@/src/components/tables/TablePagination';
 
 export interface Column<T> {
   header: string;
@@ -16,6 +17,7 @@ interface DataTableProps<T> {
 }
 
 export function DataTable<T>({ columns, data, keyExtractor, isLoading }: DataTableProps<T>) {
+  const pagination = usePagination(data || []);
   if (isLoading) {
     return (
       <div className="w-full bg-white rounded-xl border border-slate-200 p-6 animate-pulse space-y-3">
@@ -44,7 +46,7 @@ export function DataTable<T>({ columns, data, keyExtractor, isLoading }: DataTab
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
-            {data.map((row) => (
+            {pagination.pageItems.map((row) => (
               <tr key={keyExtractor(row)} className="hover:bg-slate-50/80 transition-colors">
                 {columns.map((col, idx) => (
                   <td key={idx} className={`px-5 py-3.5 whitespace-nowrap ${col.className || ''}`}>
@@ -60,6 +62,7 @@ export function DataTable<T>({ columns, data, keyExtractor, isLoading }: DataTab
           </tbody>
         </table>
       </div>
+      <TablePagination {...pagination} />
     </div>
   );
 }

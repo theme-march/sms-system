@@ -25,6 +25,9 @@ import {
   School,
   CalendarDays,
   Globe,
+  ChevronDown,
+  BriefcaseBusiness,
+  WalletCards,
 } from "lucide-react";
 import {
   NAVIGATION_GROUPS,
@@ -45,6 +48,7 @@ const icons = {
   Dashboard: LayoutDashboard,
   "My Dashboard": LayoutDashboard,
   "My Profile": UserCheck,
+  "Attendance Details": CalendarCheck2,
   "My Syllabus": BookOpen,
   "My Class Routine": Clock,
   "My Exam Routine": CalendarDays,
@@ -94,6 +98,15 @@ const icons = {
   "My Salary & Payslips": DollarSign,
 } as const;
 
+const groupIcons = {
+  "Core Management": Settings,
+  "Website Settings": Globe,
+  "Academic & Administration": GraduationCap,
+  "Operations & Evaluation": ClipboardList,
+  "Finance & Accounts": WalletCards,
+  "Self Service": BriefcaseBusiness,
+} as const;
+
 export function Sidebar({
   isMobileOpen,
   onCloseMobile,
@@ -115,6 +128,15 @@ export function Sidebar({
   const isTeacherOnly =
     roles.includes("Teacher") &&
     !roles.some((role) => managementRoles.includes(role));
+  const teacherNavigationItems = new Set([
+    "Attendance Tracker",
+    "Class Routines",
+    "Exams & Results",
+    "Homework Assignments",
+    "Leave Management",
+    "My Leave & Salary",
+    "My Salary & Payslips",
+  ]);
   const teacherPortalItem = NAVIGATION_GROUPS.flatMap(
     (group) => group.items,
   ).find((item) => item.label === "Teacher Portal");
@@ -124,6 +146,12 @@ export function Sidebar({
   const studentPortalItem = NAVIGATION_GROUPS.flatMap(
     (group) => group.items,
   ).find((item) => item.label === "Student Portal");
+  const isGuardianOnly =
+    roles.includes("Parent/Guardian") &&
+    !roles.some((role) => managementRoles.includes(role));
+  const guardianPortalItem = NAVIGATION_GROUPS.flatMap(
+    (group) => group.items,
+  ).find((item) => item.label === "Parent Portal");
   const navGroups = NAVIGATION_GROUPS.map((group) => ({
     ...group,
     items: [
@@ -169,6 +197,23 @@ export function Sidebar({
             },
           ]
         : []),
+      ...(isGuardianOnly &&
+      group.title === "Core Management" &&
+      guardianPortalItem
+        ? [
+            { ...guardianPortalItem, label: "My Dashboard", href: "/guardian" },
+            {
+              ...guardianPortalItem,
+              label: "My Profile",
+              href: "/guardian/profile",
+            },
+            {
+              ...guardianPortalItem,
+              label: "Attendance Details",
+              href: "/guardian/attendance",
+            },
+          ]
+        : []),
       ...group.items
         .filter((item) =>
           canAccessPermission(permissions, roles, item.permission),
@@ -177,7 +222,7 @@ export function Sidebar({
           (item) =>
             !(
               isTeacherOnly &&
-              ["Dashboard", "Teacher Portal"].includes(item.label)
+              !teacherNavigationItems.has(item.label)
             ),
         )
         .filter(
@@ -186,9 +231,50 @@ export function Sidebar({
               isStudentOnly &&
               ["Dashboard", "Student Portal"].includes(item.label)
             ),
+        )
+        .filter(
+          (item) =>
+            !(
+              isGuardianOnly &&
+              !["My Dashboard", "My Profile", "Attendance Details"].includes(item.label)
+            ),
         ),
     ],
   })).filter((group) => group.items.length > 0);
+
+  const activeNavHref = navGroups
+    .flatMap((group) => group.items)
+    .filter((item) => {
+      const itemPath = item.href.split("?")[0];
+      return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+    })
+    .sort(
+      (first, second) =>
+        second.href.split("?")[0].length - first.href.split("?")[0].length,
+    )[0]?.href;
+  const activeGroupTitle = navGroups.find((group) =>
+    group.items.some((item) => item.href === activeNavHref),
+  )?.title;
+  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(
+    () => new Set(navGroups.map((group) => group.title)),
+  );
+  const allGroupsExpanded = navGroups.every((group) => expandedGroups.has(group.title));
+
+  React.useEffect(() => {
+    if (!activeGroupTitle) return;
+    setExpandedGroups((current) => {
+      if (current.has(activeGroupTitle)) return current;
+      return new Set([...current, activeGroupTitle]);
+    });
+  }, [activeGroupTitle]);
+
+  const toggleGroup = (title: string) => {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      next.has(title) ? next.delete(title) : next.add(title);
+      return next;
+    });
+  };
 
   const sidebarContent = (
     <div className="dashboard-sidebar flex h-full min-h-0 flex-col border-r border-slate-200/80 bg-white">
@@ -216,20 +302,44 @@ export function Sidebar({
       </div>
 
       {/* Navigation Links */}
-      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-4 scrollbar-thin">
-        {navGroups.map((group, idx) => (
-          <div key={idx}>
-            <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-              {group.title}
-            </p>
-            <div className="space-y-1">
+      <nav className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+        <div className="mb-3 flex items-center justify-between px-2">
+          <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-slate-400">Navigation</span>
+          <button
+            type="button"
+            onClick={() => setExpandedGroups(allGroupsExpanded
+              ? new Set(activeGroupTitle ? [activeGroupTitle] : [])
+              : new Set(navGroups.map((group) => group.title)))}
+            className="rounded-md px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            {allGroupsExpanded ? "Collapse" : "Expand all"}
+          </button>
+        </div>
+        <div className="space-y-2">
+        {navGroups.map((group) => {
+          const expanded = expandedGroups.has(group.title);
+          const groupActive = group.title === activeGroupTitle;
+          const GroupIcon = groupIcons[group.title as keyof typeof groupIcons] || Settings;
+          return (
+          <section key={group.title} className={`overflow-hidden rounded-xl border transition ${groupActive ? "border-teal-200 bg-teal-50/30" : "border-slate-100 bg-white"}`}>
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.title)}
+              aria-expanded={expanded}
+              className={`flex w-full items-center gap-2.5 px-3 py-3 text-left transition ${expanded ? "border-b border-slate-100" : "hover:bg-slate-50"}`}
+            >
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${groupActive ? "bg-teal-600 text-white" : "bg-slate-50 text-slate-500"}`}>
+                <GroupIcon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={`block truncate text-[11px] font-extrabold uppercase tracking-wide ${groupActive ? "text-teal-700" : "text-slate-600"}`}>{group.title}</span>
+                <span className="mt-0.5 block text-[9px] font-semibold text-slate-400">{group.items.length} menu {group.items.length === 1 ? "item" : "items"}</span>
+              </span>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-0" : "-rotate-90"}`} />
+            </button>
+            {expanded && <div className="space-y-1 p-2">
               {group.items.map((item) => {
-                const itemPath = item.href.split("?")[0];
-                const isActive =
-                  pathname === itemPath ||
-                  (itemPath !== "/dashboard" &&
-                    itemPath !== "/dashboard/website-settings" &&
-                    pathname.startsWith(`${itemPath}/`));
+                const isActive = item.href === activeNavHref;
                 const Icon =
                   icons[item.label as keyof typeof icons] || LayoutDashboard;
 
@@ -256,9 +366,11 @@ export function Sidebar({
                   </Link>
                 );
               })}
-            </div>
-          </div>
-        ))}
+            </div>}
+          </section>
+          );
+        })}
+        </div>
       </nav>
 
       {/* Footer Info */}
